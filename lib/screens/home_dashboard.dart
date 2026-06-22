@@ -1,11 +1,11 @@
-
-
 import 'package:flutter/material.dart';
-import 'scan_camera_screen.dart';
+
 import 'document_vault.dart';
 import 'my_scans_screen.dart';
 import 'profile_screen.dart';
 import 'recent_document_preview_screen.dart';
+import 'scan_camera_screen.dart';
+import 'share_document_screen.dart';
 
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({super.key});
@@ -16,54 +16,88 @@ class HomeDashboard extends StatefulWidget {
 
 class _HomeDashboardState extends State<HomeDashboard> {
   int currentIndex = 0;
+  bool _isHomeSelectionMode = false;
 
-  final List<Widget> screens = [
-    const HomeDashboardContent(), // We'll keep main content here
-    const DocumentVaultScreen(),
-    const ScanCameraScreen(),
-    const MyScansScreen(),
-    const ProfileScreen(),
-  ];
+  Widget _currentScreen() {
+    switch (currentIndex) {
+      case 0:
+        return HomeDashboardContent(
+          onSelectionModeChanged: (isSelecting) {
+            if (_isHomeSelectionMode != isSelecting) {
+              setState(() {
+                _isHomeSelectionMode = isSelecting;
+              });
+            }
+          },
+        );
+      case 1:
+        return const DocumentVaultScreen();
+      case 2:
+        return const ScanCameraScreen();
+      case 3:
+        return const MyScansScreen();
+      case 4:
+      default:
+        return const ProfileScreen();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: screens[currentIndex],
+        child: _currentScreen(),
       ),
-
-      /// Bottom Navigation
-      bottomNavigationBar: Container(
-        height: 78,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _navItem(Icons.home, "Home", currentIndex == 0, () => setState(() => currentIndex = 0)),
-            _navItem(Icons.folder_copy_outlined, "Vault", currentIndex == 1, () => setState(() => currentIndex = 1)),
-            
-            // Big Scan Button
-            GestureDetector(
-              onTap: () => setState(() => currentIndex = 2),
-              child: Container(
-                width: 65,
-                height: 65,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF2F6BFF),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.camera_alt, color: Colors.white, size: 32),
+      bottomNavigationBar: currentIndex == 0 && _isHomeSelectionMode
+          ? null
+          : Container(
+              height: 78,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _navItem(
+                    Icons.home,
+                    'Home',
+                    currentIndex == 0,
+                    () => setState(() => currentIndex = 0),
+                  ),
+                  _navItem(
+                    Icons.folder_copy_outlined,
+                    'Vault',
+                    currentIndex == 1,
+                    () => setState(() => currentIndex = 1),
+                  ),
+                  GestureDetector(
+                    onTap: () => setState(() => currentIndex = 2),
+                    child: Container(
+                      width: 65,
+                      height: 65,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF2F6BFF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 32),
+                    ),
+                  ),
+                  _navItem(
+                    Icons.history,
+                    'Scans',
+                    currentIndex == 3,
+                    () => setState(() => currentIndex = 3),
+                  ),
+                  _navItem(
+                    Icons.person_outline,
+                    'Profile',
+                    currentIndex == 4,
+                    () => setState(() => currentIndex = 4),
+                  ),
+                ],
               ),
             ),
-
-            _navItem(Icons.history, "Scans", currentIndex == 3, () => setState(() => currentIndex = 3)),
-            _navItem(Icons.person_outline, "Profile", currentIndex == 4, () => setState(() => currentIndex = 4)),
-          ],
-        ),
-      ),
     );
   }
 
@@ -88,9 +122,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 }
 
-// Extracted Main Content (to avoid duplication)
 class HomeDashboardContent extends StatefulWidget {
-  const HomeDashboardContent({super.key});
+  const HomeDashboardContent({super.key, this.onSelectionModeChanged});
+
+  final ValueChanged<bool>? onSelectionModeChanged;
 
   @override
   State<HomeDashboardContent> createState() => _HomeDashboardContentState();
@@ -117,6 +152,153 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
       notes: 'Office timings memorandum for all staff.',
     ),
   ];
+
+  bool get _hasSelectedDocuments => _recentDocuments.any((doc) => doc.isSelected);
+  int get _selectedCount => _recentDocuments.where((doc) => doc.isSelected).length;
+  bool get _canMerge => _selectedCount > 1;
+
+  List<_RecentDocument> get _selectedDocuments =>
+      _recentDocuments.where((doc) => doc.isSelected).toList();
+
+  void _syncSelectionMode() {
+    widget.onSelectionModeChanged?.call(_hasSelectedDocuments);
+  }
+
+  void _handleBulkAction(String action) {
+    if (!_hasSelectedDocuments) {
+      return;
+    }
+
+    if (action == 'Share') {
+      _openShareForSelectedDocuments();
+      return;
+    }
+
+    if (action == 'Delete') {
+      setState(() {
+        _recentDocuments.removeWhere((doc) => doc.isSelected);
+      });
+      _syncSelectionMode();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selected documents deleted.')),
+      );
+      return;
+    }
+
+    if (action == 'More') {
+      _showMoreActions();
+      return;
+    }
+
+    if (action == 'Rename') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Rename $_selectedCount selected document(s).')),
+      );
+      return;
+    }
+
+    if (action == 'Merge') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Merging $_selectedCount selected document(s)...')),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$action for $_selectedCount selected document(s).')),
+    );
+  }
+
+  void _openShareForSelectedDocuments() {
+    final List<_RecentDocument> selectedDocuments = _selectedDocuments;
+    if (selectedDocuments.isEmpty) {
+      return;
+    }
+
+    final _RecentDocument primaryDocument = selectedDocuments.first;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ShareDocumentScreen(
+          title: primaryDocument.title,
+          referenceNumber: primaryDocument.reference,
+          notes: selectedDocuments.map((doc) => doc.notes).join('\n'),
+          attachedImagePaths: selectedDocuments.map((doc) => doc.reference).toList(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showMoreActions() async {
+    final String? selectedOption = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: const Color(0xFF1E232B),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) {
+        return SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 10),
+              _moreActionTile(
+                icon: Icons.photo_library_outlined,
+                title: 'Save to photo',
+                value: 'save_photo',
+              ),
+              _moreActionTile(
+                icon: Icons.print_outlined,
+                title: 'Print',
+                value: 'print',
+              ),
+              _moreActionTile(
+                icon: Icons.download_outlined,
+                title: 'Save to PC (Download PDF)',
+                value: 'download_pdf',
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (selectedOption == null || !mounted) {
+      return;
+    }
+
+    if (selectedOption == 'save_photo') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Saving $_selectedCount selected document(s) to photo gallery...')),
+      );
+      return;
+    }
+
+    if (selectedOption == 'print') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Printing $_selectedCount selected document(s)...')),
+      );
+      return;
+    }
+
+    if (selectedOption == 'download_pdf') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Downloading $_selectedCount selected document(s) as PDF...')),
+      );
+    }
+  }
 
   Future<void> _confirmDelete(BuildContext context, _RecentDocument document) async {
     final bool? shouldDelete = await showDialog<bool>(
@@ -190,6 +372,7 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
             setState(() {
               _recentDocuments.remove(document);
             });
+            _syncSelectionMode();
           },
         ),
       ),
@@ -198,257 +381,614 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          /// COLORED HEADER
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-            decoration: const BoxDecoration(
-              color: Color(0xFF022A78),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text("Good morning.", style: TextStyle(color: Colors.white70, fontSize: 14)),
-                      SizedBox(height: 4),
-                      Text("John M. Komba", style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white)),
-                      SizedBox(height: 2),
-                      Text("TRA Officer", style: TextStyle(color: Colors.white70, fontSize: 14)),
-                    ],
-                  ),
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(0, 0, 0, _hasSelectedDocuments ? 96 : 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF022A78),
                 ),
-                Row(
+                child: Row(
                   children: [
-                    Stack(
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text('Good morning.', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                          SizedBox(height: 4),
+                          Text(
+                            'John M. Komba',
+                            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
+                          ),
+                          SizedBox(height: 2),
+                          Text('TRA Officer', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                        ],
+                      ),
+                    ),
+                    Row(
                       children: [
-                        IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none, size: 30, color: Colors.white)),
-                        Positioned(right: 10, top: 10, child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle))),
+                        Stack(
+                          children: [
+                            IconButton(
+                              onPressed: () {},
+                              icon: const Icon(Icons.notifications_none, size: 30, color: Colors.white),
+                            ),
+                            Positioned(
+                              right: 10,
+                              top: 10,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 8),
+                        const CircleAvatar(
+                          radius: 24,
+                          backgroundImage: AssetImage('assets/images/profile.png'),
+                        ),
                       ],
                     ),
-                    const SizedBox(width: 8),
-                    const CircleAvatar(radius: 24, backgroundImage: AssetImage("assets/images/profile.png")),
                   ],
-                )
-              ],
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, -18, 20, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                /// OFFLINE CARD
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(color: const Color(0xFFFFF8EB), borderRadius: BorderRadius.circular(18)),
-            child: Row(
-              children: [
-                const Icon(Icons.cloud_off_outlined, color: Color(0xFF0A1F44)),
-                const SizedBox(width: 14),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("You are offline", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      SizedBox(height: 4),
-                      Text("Your changes will sync when connection is restored.", style: TextStyle(fontSize: 13, color: Colors.grey)),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right, color: Colors.grey),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          /// STATS
-          Row(
-            children: [
-              Expanded(child: _statCard("245", "Documents")),
-              const SizedBox(width: 12),
-              Expanded(child: _statCard("12", "Pending Sync")),
-              const SizedBox(width: 12),
-              Expanded(child: _statCard("6", "Shared Today")),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          /// QUICK ACTIONS
-          const Text("Quick Actions", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 14),
-
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            childAspectRatio: 2.8,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            children: [
-              _quickAction(Icons.camera_alt, Colors.blue, "Scan Document", () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanCameraScreen()));
-              }),
-              _quickAction(Icons.folder, Colors.amber, "Open Vault", () {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentVaultScreen()));
-              }),
-              _quickAction(Icons.people_alt, Colors.indigo, "Share Within TRA", () {}),
-              _quickAction(Icons.download, Colors.green, "Download Center", () {}),
-            ],
-          ),
-
-          const SizedBox(height: 28),
-
-          /// RECENT DOCUMENTS
-          const Text("Recent Documents", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 14),
-          if (_recentDocuments.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text(
-                  'No recent documents available.',
-                  style: TextStyle(color: Colors.grey),
                 ),
               ),
-            )
-          else
-            ..._recentDocuments.map((doc) => _documentTile(context, doc)),
-              ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Transform.translate(
+                      offset: const Offset(0, -20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFFFFF7E3),
+                              Color(0xFFFFE8B8),
+                              Color(0xFFFFF6DE),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFFFD57A), width: 1.1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFD66B).withValues(alpha: 0.28),
+                              blurRadius: 18,
+                              offset: const Offset(0, 6),
+                              spreadRadius: 1,
+                            ),
+                            BoxShadow(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              blurRadius: 10,
+                              offset: const Offset(-1, -1),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0A1F44).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                              child: const Icon(Icons.cloud_off_outlined, color: Color(0xFF0A1F44), size: 18),
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('You are offline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0A1F44))),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Your changes will sync when connection is restored.',
+                                    style: TextStyle(fontSize: 11, color: Color(0xFF5B6474)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.chevron_right, color: Color(0xFF7B6B3A), size: 18),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 86,
+                            child: _statCard('245', 'Documents'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 86,
+                            child: _statCard('12', 'Pending Sync'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: SizedBox(
+                            height: 86,
+                            child: _statCard('6', 'Shared Today'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Text('Quick Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const SizedBox(height: 14),
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      childAspectRatio: 2.6,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      children: [
+                        _quickAction(Icons.camera_alt, 'Scan Document', () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanCameraScreen()));
+                        }),
+                        _quickAction(Icons.folder, 'Open Vault', () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentVaultScreen()));
+                        }),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
+                    const Text('Recent Documents', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const SizedBox(height: 14),
+                    if (_recentDocuments.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: Text(
+                            'No recent documents available.',
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      )
+                    else
+                      ..._recentDocuments.map((doc) => _documentTile(context, doc)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_hasSelectedDocuments)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Container(
+                height: 78,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF20242B),
+                  border: Border(top: BorderSide(color: Color(0xFF2E333C))),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _bottomAction(Icons.share_outlined, 'Share', () => _handleBulkAction('Share')),
+                    _bottomAction(Icons.drive_file_move_outline, 'Move/Copy', () => _handleBulkAction('Move/Copy')),
+                    _bottomAction(
+                      _canMerge ? Icons.merge_type : Icons.drive_file_rename_outline,
+                      _canMerge ? 'Merge' : 'Rename',
+                      () => _handleBulkAction(_canMerge ? 'Merge' : 'Rename'),
+                    ),
+                    _bottomAction(Icons.delete_outline, 'Delete', () => _handleBulkAction('Delete')),
+                    _bottomAction(Icons.more_horiz, 'More', () => _handleBulkAction('More')),
+                  ],
+                ),
+              ),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
   Widget _statCard(String number, String label) {
+    IconData icon;
+    Color accentColor;
+    List<Color> surfaceColors;
+    Color borderColor;
+
+    if (label.contains('Documents')) {
+      icon = Icons.description_outlined;
+      accentColor = const Color(0xFF2F6BFF);
+      surfaceColors = const [Color(0xFFF7FAFF), Color(0xFFEDF3FF), Color(0xFFF9FBFF)];
+      borderColor = const Color(0xFFD6E4FF);
+    } else if (label.contains('Pending')) {
+      icon = Icons.cloud_sync_outlined;
+      accentColor = const Color(0xFF0EA5A4);
+      surfaceColors = const [Color(0xFFF4FFFD), Color(0xFFE9FFFB), Color(0xFFF6FFFD)];
+      borderColor = const Color(0xFFCDEFEA);
+    } else {
+      icon = Icons.share_outlined;
+      accentColor = const Color(0xFF7C5CFF);
+      surfaceColors = const [Color(0xFFF8F6FF), Color(0xFFF1EDFF), Color(0xFFFBFAFF)];
+      borderColor = const Color(0xFFE1D8FF);
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18),
+      padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: surfaceColors,
+        ),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFF1F1F1)),
+        border: Border.all(color: borderColor, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.white.withValues(alpha: 0.95),
+            blurRadius: 22,
+            offset: const Offset(-2, -2),
+            spreadRadius: 1,
+          ),
+          BoxShadow(
+            color: accentColor.withValues(alpha: 0.16),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Column(
+      child: Stack(
         children: [
-          Text(number, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold)),
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          Positioned(
+            right: -14,
+            top: -14,
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accentColor.withValues(alpha: 0.12),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      number,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        height: 1.0,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF141414),
+                        letterSpacing: -0.25,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF3F3F3F),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 5),
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFFFFFFFF),
+                      accentColor.withValues(alpha: 0.14),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      blurRadius: 12,
+                      offset: const Offset(-1, -1),
+                    ),
+                  ],
+                ),
+                  child: Icon(icon, color: accentColor, size: 15),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _quickAction(IconData icon, Color color, String title, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFF1F1F1)),
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: 14),
-            Icon(icon, color: color),
-            const SizedBox(width: 10),
-            Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600))),
-          ],
+  Widget _quickAction(IconData icon, String title, VoidCallback onTap) {
+      Color accentColor;
+      List<Color> surfaceColors;
+      Color borderColor;
+
+      if (title.contains('Scan')) {
+        accentColor = const Color(0xFF2F6BFF);
+        surfaceColors = const [Color(0xFFF7FAFF), Color(0xFFEDF3FF), Color(0xFFF9FBFF)];
+        borderColor = const Color(0xFFD6E4FF);
+      } else {
+        accentColor = const Color(0xFF0EA5A4);
+        surfaceColors = const [Color(0xFFF4FFFD), Color(0xFFE9FFFB), Color(0xFFF6FFFD)];
+        borderColor = const Color(0xFFCDEFEA);
+      }
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+                colors: surfaceColors,
+            ),
+            borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.white.withValues(alpha: 0.95),
+                blurRadius: 22,
+                offset: const Offset(-2, -2),
+                spreadRadius: 1,
+              ),
+              BoxShadow(
+                  color: accentColor.withValues(alpha: 0.16),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFFFFFFFF),
+                      accentColor.withValues(alpha: 0.14),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      blurRadius: 12,
+                      offset: const Offset(-1, -1),
+                    ),
+                  ],
+                ),
+                child: Icon(icon, color: accentColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    height: 1.2,
+                    color: Color(0xFF141414),
+                    letterSpacing: -0.05,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _documentTile(
-    BuildContext context,
-    _RecentDocument document,
-  ) {
+  Widget _documentTile(BuildContext context, _RecentDocument document) {
+    final bool isSelected = document.isSelected;
+    final Color cardColor = isSelected ? const Color(0xFFEBF4FE) : Colors.white;
+    final Color primaryTextColor = isSelected ? const Color(0xFF1A1F2E) : const Color(0xFF111827);
+    final Color secondaryTextColor = isSelected ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF);
+    final Color borderColor = isSelected ? const Color(0xFF2F6BFF) : const Color(0xFFD6E7FB);
+    final Color iconBgColor = isSelected ? const Color(0xFFD6E7FB) : const Color(0xFFF0F4FF);
+
     return InkWell(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(20),
       onTap: () => _openPreview(context, document),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor, width: 1.3),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.white.withValues(alpha: 0.95),
+              blurRadius: isSelected ? 22 : 18,
+              offset: const Offset(-2, -2),
+              spreadRadius: 1,
+            ),
+            BoxShadow(
+              color: const Color(0xFF000000).withValues(alpha: 0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
         child: Row(
           children: [
             Container(
-              width: 45,
-              height: 45,
-              decoration: BoxDecoration(color: const Color(0xFFF4F4F4), borderRadius: BorderRadius.circular(12)),
-              child: const Icon(Icons.picture_as_pdf, color: Colors.grey),
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: iconBgColor,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected ? const Color(0xFFC0D9F7) : const Color(0xFFE0E9F8),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                Icons.picture_as_pdf,
+                color: isSelected ? const Color(0xFF2F6BFF) : const Color(0xFF4B82FF),
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(document.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  Text(
+                    document.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: primaryTextColor,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Text(
                     '${document.reference} • ${document.time}',
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: secondaryTextColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(8)),
-              child: const Text("PDF", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF2F6BFF).withOpacity(0.15) : const Color(0xFFD1FAE5),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                'PDF',
+                style: TextStyle(
+                  color: isSelected ? const Color(0xFF2F6BFF) : const Color(0xFF10B981),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                  letterSpacing: 0.3,
+                ),
+              ),
             ),
             const SizedBox(width: 8),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'preview') {
-                  _openPreview(context, document);
-                } else if (value == 'edit') {
-                  _showEditNameDialog(context, document);
-                } else if (value == 'delete') {
-                  _confirmDelete(context, document);
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem<String>(
-                  value: 'preview',
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(Icons.visibility_outlined),
-                    title: Text('Preview & Share'),
-                  ),
+            SizedBox(
+              width: 42,
+              height: 42,
+              child: Checkbox(
+                value: document.isSelected,
+                onChanged: (checked) {
+                  setState(() {
+                    document.isSelected = checked ?? false;
+                  });
+                  _syncSelectionMode();
+                },
+                activeColor: const Color(0xFF2F6BFF),
+                checkColor: Colors.white,
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFF2F6BFF) : const Color(0xFFD1D5DB),
+                  width: 2,
                 ),
-                PopupMenuItem<String>(
-                  value: 'edit',
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(Icons.edit_outlined),
-                    title: Text('Edit Name'),
-                  ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                PopupMenuItem<String>(
-                  value: 'delete',
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(Icons.delete_outline, color: Colors.redAccent),
-                    title: Text('Delete'),
-                  ),
-                ),
-              ],
-              icon: const Icon(Icons.more_vert),
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _bottomAction(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: Colors.white, size: 22),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 11)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _moreActionTile({
+    required IconData icon,
+    required String title,
+    required String value,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.white),
+      title: Text(
+        title,
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+      ),
+      onTap: () => Navigator.pop(context, value),
     );
   }
 }
@@ -459,10 +999,12 @@ class _RecentDocument {
     required this.reference,
     required this.time,
     required this.notes,
+    this.isSelected = false,
   });
 
   String title;
   final String reference;
   final String time;
   final String notes;
+  bool isSelected;
 }

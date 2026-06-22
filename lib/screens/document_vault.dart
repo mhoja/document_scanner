@@ -21,69 +21,97 @@ class DocumentVaultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: const Text("Document Vault"),
-        backgroundColor: const Color(0xFF003087),
+        backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-      ),
-      body: Column(
-        children: [
-          // Search Bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: "Search title, content, reference...",
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-            ),
-          ),
-
-          // Tabs
+        elevation: 0,
+        title: const Text('Tools', style: TextStyle(fontWeight: FontWeight.w700)),
+        actions: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: const [
-                Text("All (245)", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF003087))),
-                Text("Recent"),
-                Text("Favorites"),
-                Text("Shared"),
-                Text("Archived"),
-              ],
+            margin: const EdgeInsets.only(right: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D201B),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFF0B3B31)),
+            ),
+            child: const Text(
+              "What's New",
+              style: TextStyle(color: Color(0xFF11B89A), fontWeight: FontWeight.w600),
             ),
           ),
-
-          const Divider(),
-
-          // Document List
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                _buildDocumentItem("Tax Compliance Guidelines", "TCG/2026/001", "20 May 2024"),
-                _buildDocumentItem("HR Circular - Leave Policy", "HR/CR/2026/002", "19 May 2024"),
-                _buildDocumentItem("Office Memorandum", "TRADM/2024/045", "18 May 2024"),
-              ],
-            ),
+          const Padding(
+            padding: EdgeInsets.only(right: 16),
+            child: Icon(Icons.search, color: Colors.white),
           ),
         ],
       ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Convert',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 18),
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 4,
+                mainAxisSpacing: 18,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1.0,
+                children: const [
+                  _ToolItem(icon: Icons.description, label: 'To Word', color: Color(0xFF5B7CFF)),
+                  _ToolItem(icon: Icons.grid_on, label: 'To Excel', color: Color(0xFF22C55E)),
+                  _ToolItem(icon: Icons.slideshow, label: 'To PPT', color: Color(0xFFFF7A59)),
+                  _ToolItem(icon: Icons.image, label: 'To Images', color: Color(0xFF2DD4BF)),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
+}
 
-  Widget _buildDocumentItem(String title, String ref, String date) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: const Icon(Icons.picture_as_pdf, color: Colors.red, size: 40),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text("$ref • $date"),
-        trailing: const Icon(Icons.star_border),
-      ),
+class _ToolItem extends StatelessWidget {
+  const _ToolItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 26),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.1),
+        ),
+      ],
     );
   }
 }
