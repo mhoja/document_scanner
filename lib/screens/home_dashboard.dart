@@ -16,16 +16,16 @@ class HomeDashboard extends StatefulWidget {
 
 class _HomeDashboardState extends State<HomeDashboard> {
   int currentIndex = 0;
-  bool _isHomeSelectionMode = false;
+  bool _isSelectionModeActive = false;
 
   Widget _currentScreen() {
     switch (currentIndex) {
       case 0:
         return HomeDashboardContent(
           onSelectionModeChanged: (isSelecting) {
-            if (_isHomeSelectionMode != isSelecting) {
+            if (_isSelectionModeActive != isSelecting) {
               setState(() {
-                _isHomeSelectionMode = isSelecting;
+                _isSelectionModeActive = isSelecting;
               });
             }
           },
@@ -35,7 +35,15 @@ class _HomeDashboardState extends State<HomeDashboard> {
       case 2:
         return const ScanCameraScreen();
       case 3:
-        return const MyScansScreen();
+        return MyScansScreen(
+          onSelectionModeChanged: (isSelecting) {
+            if (_isSelectionModeActive != isSelecting) {
+              setState(() {
+                _isSelectionModeActive = isSelecting;
+              });
+            }
+          },
+        );
       case 4:
       default:
         return const ProfileScreen();
@@ -48,7 +56,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
       body: SafeArea(
         child: _currentScreen(),
       ),
-      bottomNavigationBar: currentIndex == 0 && _isHomeSelectionMode
+        bottomNavigationBar: ((currentIndex == 0 || currentIndex == 3) && _isSelectionModeActive)
           ? null
           : Container(
               height: 78,
@@ -66,8 +74,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
                     () => setState(() => currentIndex = 0),
                   ),
                   _navItem(
-                    Icons.folder_copy_outlined,
-                    'Vault',
+                    Icons.handyman_outlined,
+                    'Tools',
                     currentIndex == 1,
                     () => setState(() => currentIndex = 1),
                   ),
@@ -555,7 +563,7 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
                         _quickAction(Icons.camera_alt, 'Scan Document', () {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanCameraScreen()));
                         }),
-                        _quickAction(Icons.folder, 'Open Vault', () {
+                        _quickAction(Icons.handyman_outlined, 'Open Tools', () {
                           Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentVaultScreen()));
                         }),
                       ],
