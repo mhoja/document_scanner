@@ -58,6 +58,8 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
 
   String _shareMode = 'Staff';
   bool _isSending = false;
+  bool _sendToAllStaff = false;
+  bool _allStaffAsCc = false;
 
   List<_ShareRecipient> get _filteredRecipients {
     final String query = _searchController.text.trim().toLowerCase();
@@ -85,9 +87,9 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
 
     final List<_ShareRecipient> recipients = _selectedRecipients;
 
-    if (recipients.isEmpty) {
+    if (recipients.isEmpty && !_sendToAllStaff) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Select at least one $_shareMode recipient to share with.')),
+        const SnackBar(content: Text('Select at least one recipient or enable All Staff Group.')),
       );
       return;
     }
@@ -105,20 +107,56 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
     });
 
     try {
-      final String to = recipients.map((r) => r.email).join(';');
+      final List<String> toRecipients = <String>[];
+      final List<String> ccRecipients = <String>[];
+
+      for (final _ShareRecipient recipient in recipients) {
+        if (recipient.delivery == _DeliveryType.cc) {
+          ccRecipients.add(recipient.email);
+        } else {
+          toRecipients.add(recipient.email);
+        }
+      }
+
+      if (_sendToAllStaff) {
+        if (_allStaffAsCc) {
+          ccRecipients.add('group.allstaff@tra.go.tz');
+        } else {
+          toRecipients.add('group.allstaff@tra.go.tz');
+        }
+      }
+
+      if (toRecipients.isEmpty && ccRecipients.isNotEmpty) {
+        toRecipients.add(ccRecipients.removeAt(0));
+      }
+
+      if (toRecipients.isEmpty && ccRecipients.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please add at least one To or CC recipient.')),
+        );
+        setState(() {
+          _isSending = false;
+        });
+        return;
+      }
+
+      final String to = toRecipients.join(';');
+      final String cc = ccRecipients.join(';');
       final String subject = Uri.encodeComponent('TRA Document: ${widget.title}');
       final String body = Uri.encodeComponent(
         'A document has been shared with you within TRA.\n\n'
         'Title: ${widget.title}\n'
         'Reference: ${widget.referenceNumber}\n'
         'Share Type: $_shareMode\n'
+        'To Recipients: ${toRecipients.length}\n'
+        'CC Recipients: ${ccRecipients.length}\n'
         'Attached Pages: ${widget.attachedImagePaths.length}\n'
         'Notes: ${widget.notes.isEmpty ? '-' : widget.notes}\n\n'
         'This share is intended for TRA network recipients only.',
       );
 
       final Uri composeUri = Uri.parse(
-        'https://mail.tra.go.tz/owa/#path=/mail/action/compose&to=$to&subject=$subject&body=$body',
+        'https://mail.tra.go.tz/owa/#path=/mail/action/compose&to=$to&cc=$cc&subject=$subject&body=$body',
       );
 
       if (!await canLaunchUrl(composeUri)) {
@@ -325,6 +363,78 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
                   ),
                 ),
                 const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFF6FAFF), Color(0xFFEDF4FF)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFDCE5F8)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.groups, size: 18, color: Color(0xFF3C5694)),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'All Staff Group (no manual selection needed)',
+                              style: TextStyle(color: Color(0xFF425A93), fontWeight: FontWeight.w600, fontSize: 12),
+                            ),
+                          ),
+                          Switch(
+                            value: _sendToAllStaff,
+                            onChanged: (value) {
+                              setState(() {
+                                _sendToAllStaff = value;
+                              });
+                            },
+                            activeColor: _primaryBlue,
+                          ),
+                        ],
+                      ),
+                      if (_sendToAllStaff)
+                        Row(
+                          children: [
+                            _routeChip(
+                              selected: !_allStaffAsCc,
+                              label: 'To',
+                              onTap: () {
+                                setState(() {
+                                  _allStaffAsCc = false;
+                                });
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            _routeChip(
+                              selected: _allStaffAsCc,
+                              label: 'CC',
+                              onTap: () {
+                                setState(() {
+                                  _allStaffAsCc = true;
+                                });
+                              },
+                            ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text(
+                                'group.allstaff@tra.go.tz',
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: Color(0xFF5D73A2), fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
@@ -472,33 +582,95 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
             ? Icons.groups_2_outlined
             : Icons.verified_user_outlined;
 
-    return CheckboxListTile(
-      value: recipient.selected,
-      activeColor: _primaryBlue,
-      checkColor: Colors.white,
-      controlAffinity: ListTileControlAffinity.leading,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-      onChanged: (value) {
-        setState(() {
-          recipient.selected = value ?? false;
-        });
-      },
-      title: Text(
-        recipient.name,
-        style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF172E64)),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      child: Row(
+        children: [
+          Checkbox(
+            value: recipient.selected,
+            activeColor: _primaryBlue,
+            checkColor: Colors.white,
+            onChanged: (value) {
+              setState(() {
+                recipient.selected = value ?? false;
+              });
+            },
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  recipient.name,
+                  style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF172E64)),
+                ),
+                Text(
+                  recipient.subtitle == null ? recipient.email : '${recipient.subtitle} • ${recipient.email}',
+                  style: const TextStyle(color: Color(0xFF6278A4), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _routeChip(
+            selected: recipient.delivery == _DeliveryType.to,
+            label: 'To',
+            onTap: () {
+              setState(() {
+                recipient.delivery = _DeliveryType.to;
+                recipient.selected = true;
+              });
+            },
+          ),
+          const SizedBox(width: 6),
+          _routeChip(
+            selected: recipient.delivery == _DeliveryType.cc,
+            label: 'CC',
+            onTap: () {
+              setState(() {
+                recipient.delivery = _DeliveryType.cc;
+                recipient.selected = true;
+              });
+            },
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: badgeBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(badgeIcon, color: badgeIconColor, size: 18),
+          ),
+        ],
       ),
-      subtitle: Text(
-        recipient.subtitle == null ? recipient.email : '${recipient.subtitle} • ${recipient.email}',
-        style: const TextStyle(color: Color(0xFF6278A4)),
-      ),
-      secondary: Container(
-        width: 34,
-        height: 34,
+    );
+  }
+
+  Widget _routeChip({
+    required bool selected,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: badgeBg,
-          borderRadius: BorderRadius.circular(10),
+          color: selected ? const Color(0xFF2B64FF) : const Color(0xFFE9F0FF),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: selected ? const Color(0xFF2B64FF) : const Color(0xFFCFDBF6)),
         ),
-        child: Icon(badgeIcon, color: badgeIconColor, size: 20),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? Colors.white : const Color(0xFF4A5F8F),
+            fontWeight: FontWeight.w700,
+            fontSize: 11,
+          ),
+        ),
       ),
     );
   }
@@ -553,6 +725,7 @@ class _ShareRecipient {
     required this.email,
     this.subtitle,
     this.selected = false,
+    this.delivery = _DeliveryType.to,
   });
 
   final String category;
@@ -560,4 +733,7 @@ class _ShareRecipient {
   final String email;
   final String? subtitle;
   bool selected;
+  _DeliveryType delivery;
 }
+
+enum _DeliveryType { to, cc }

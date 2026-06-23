@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'share_document_screen.dart';
+
 class MyScansScreen extends StatefulWidget {
   const MyScansScreen({super.key, this.onSelectionModeChanged});
 
@@ -25,6 +27,7 @@ class _MyScansScreenState extends State<MyScansScreen> {
 
   bool get _hasSelection => _selectedIds.isNotEmpty;
   bool get _canMerge => _selectedIds.length > 1;
+  List<_ScanDocument> get _selectedDocuments => _documents.where((doc) => _selectedIds.contains(doc.id)).toList();
 
   void _notifySelectionMode() {
     widget.onSelectionModeChanged?.call(_hasSelection);
@@ -43,6 +46,11 @@ class _MyScansScreenState extends State<MyScansScreen> {
 
   void _runBulkAction(String action) {
     if (!_hasSelection) {
+      return;
+    }
+
+    if (action == 'Share') {
+      _openShareForSelectedDocuments();
       return;
     }
 
@@ -65,6 +73,27 @@ class _MyScansScreenState extends State<MyScansScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$action for ${_selectedIds.length} selected document(s).')),
+    );
+  }
+
+  void _openShareForSelectedDocuments() {
+    final List<_ScanDocument> selectedDocs = _selectedDocuments;
+    if (selectedDocs.isEmpty) {
+      return;
+    }
+
+    final _ScanDocument primary = selectedDocs.first;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ShareDocumentScreen(
+          title: selectedDocs.length == 1 ? primary.title : '${selectedDocs.length} selected scans',
+          referenceNumber: selectedDocs.length == 1 ? 'SCAN-${primary.id}' : 'MULTI-SCAN-${selectedDocs.length}',
+          notes: selectedDocs.map((doc) => '${doc.title} (${doc.date})').join('\n'),
+          attachedImagePaths: selectedDocs.map((doc) => 'scan-${doc.id}').toList(),
+        ),
+      ),
     );
   }
 
