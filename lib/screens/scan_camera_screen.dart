@@ -352,7 +352,7 @@ class _FrameCornerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
-      ..color = const Color(0xFFFFD53D)
+      ..color = const Color(0xFFF5B027)
       ..strokeWidth = 4
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;

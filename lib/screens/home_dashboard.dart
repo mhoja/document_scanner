@@ -85,7 +85,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       width: 65,
                       height: 65,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF2F6BFF),
+                        color: Color(0xFFF5B027),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.camera_alt, color: Colors.white, size: 32),
@@ -172,7 +172,7 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
     widget.onSelectionModeChanged?.call(_hasSelectedDocuments);
   }
 
-  void _handleBulkAction(String action) {
+  Future<void> _handleBulkAction(String action) async {
     if (!_hasSelectedDocuments) {
       return;
     }
@@ -183,10 +183,20 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
     }
 
     if (action == 'Delete') {
+      final bool shouldDelete = await _showCompactDeleteSheet(
+        title: 'Delete documents',
+        message: 'Delete $_selectedCount selected document(s)?',
+      );
+
+      if (!shouldDelete || !mounted) {
+        return;
+      }
+
       setState(() {
         _recentDocuments.removeWhere((doc) => doc.isSelected);
       });
       _syncSelectionMode();
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Selected documents deleted.')),
       );
@@ -199,9 +209,7 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
     }
 
     if (action == 'Rename') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Rename $_selectedCount selected document(s).')),
-      );
+      _renameSelectedDocument();
       return;
     }
 
@@ -215,6 +223,282 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$action for $_selectedCount selected document(s).')),
     );
+  }
+
+  Future<void> _renameSelectedDocument() async {
+    final List<_RecentDocument> selectedDocuments = _selectedDocuments;
+    if (selectedDocuments.length != 1) {
+      return;
+    }
+
+    final _RecentDocument document = selectedDocuments.first;
+    final String? updatedName = await _showCompactRenameSheet(
+      initialName: document.title,
+      heading: 'Rename document',
+      hint: 'Enter new name',
+    );
+
+    if (updatedName == null || updatedName.isEmpty || !mounted) {
+      return;
+    }
+
+    setState(() {
+      document.title = updatedName;
+      document.isSelected = false;
+    });
+    _syncSelectionMode();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Document renamed successfully.')),
+    );
+  }
+
+  Future<String?> _showCompactRenameSheet({
+    required String initialName,
+    required String heading,
+    required String hint,
+  }) async {
+    final TextEditingController controller = TextEditingController(text: initialName);
+
+    final String? value = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+          ),
+          child: Align(
+            alignment: Alignment.center,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFFB800).withValues(alpha: 0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 28,
+                        height: 2.5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFB800),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      heading,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFFFF5E6),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => Navigator.pop(sheetContext, controller.text.trim()),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFFFF5E6)),
+                      decoration: InputDecoration(
+                        hintText: hint,
+                        hintStyle: const TextStyle(color: Color(0xFF9A8A6E), fontSize: 12),
+                        filled: true,
+                        fillColor: const Color(0xFF242424),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFF3A3A3A)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFF3A3A3A)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 1.2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(sheetContext),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(32),
+                              side: const BorderSide(color: Color(0xFF555555)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(fontSize: 11, color: Color(0xFFC0C0C0))),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.pop(sheetContext, controller.text.trim()),
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(32),
+                              backgroundColor: const Color(0xFFFFB800),
+                              foregroundColor: const Color(0xFF1A1A1A),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Save', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    final String trimmed = (value ?? '').trim();
+    if (trimmed.isEmpty || trimmed == initialName) {
+      return null;
+    }
+    return trimmed;
+  }
+
+  Future<bool> _showCompactDeleteSheet({
+    required String title,
+    required String message,
+  }) async {
+    final bool? result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            20,
+            20,
+            MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+          ),
+          child: Align(
+            alignment: Alignment.center,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFFFB800).withValues(alpha: 0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 28,
+                        height: 2.5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFB800),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFFFF5E6),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.25,
+                        color: Color(0xFFD0D0D0),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(sheetContext, false),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(32),
+                              side: const BorderSide(color: Color(0xFF555555)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Cancel', style: TextStyle(fontSize: 11, color: Color(0xFFC0C0C0))),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.pop(sheetContext, true),
+                            style: ElevatedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(32),
+                              backgroundColor: const Color(0xFFFFB800),
+                              foregroundColor: const Color(0xFF1A1A1A),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Delete', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    return result == true;
   }
 
   void _openShareForSelectedDocuments() {
@@ -400,7 +684,7 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
                 decoration: const BoxDecoration(
-                  color: Color(0xFF022A78),
+                  color: Color(0xFFF5B027),
                 ),
                 child: Row(
                   children: [
@@ -408,14 +692,14 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: const [
-                          Text('Good morning.', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                          Text('Good morning.', style: TextStyle(color: Colors.black87, fontSize: 14)),
                           SizedBox(height: 4),
                           Text(
                             'John M. Komba',
-                            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
+                            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black),
                           ),
                           SizedBox(height: 2),
-                          Text('TRA Officer', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                          Text('TRA Officer', style: TextStyle(color: Colors.black87, fontSize: 14)),
                         ],
                       ),
                     ),
@@ -465,24 +749,19 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Color(0xFFFFF7E3),
-                              Color(0xFFFFE8B8),
-                              Color(0xFFFFF6DE),
+                              Color(0xFF050505),
+                              Color(0xFF111111),
+                              Color(0xFF000000),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFFFFD57A), width: 1.1),
+                          border: Border.all(color: Colors.white24, width: 1.1),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFFFFD66B).withValues(alpha: 0.28),
+                              color: Colors.black.withValues(alpha: 0.65),
                               blurRadius: 18,
                               offset: const Offset(0, 6),
                               spreadRadius: 1,
-                            ),
-                            BoxShadow(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              blurRadius: 10,
-                              offset: const Offset(-1, -1),
                             ),
                           ],
                         ),
@@ -492,21 +771,21 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
                               width: 28,
                               height: 28,
                               decoration: BoxDecoration(
-                                color: const Color(0xFF0A1F44).withValues(alpha: 0.1),
+                                color: Colors.white.withValues(alpha: 0.14),
                                 borderRadius: BorderRadius.circular(9),
                               ),
-                              child: const Icon(Icons.cloud_off_outlined, color: Color(0xFF0A1F44), size: 18),
+                              child: const Icon(Icons.cloud_off_outlined, color: Colors.white, size: 18),
                             ),
                             const SizedBox(width: 10),
                             const Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('You are offline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0A1F44))),
+                                  Text('You are offline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
                                   SizedBox(height: 2),
                                   Text(
                                     'Your changes will sync when connection is restored.',
-                                    style: TextStyle(fontSize: 11, color: Color(0xFF5B6474)),
+                                    style: TextStyle(fontSize: 11, color: Colors.white),
                                   ),
                                 ],
                               ),
@@ -515,10 +794,10 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
                               width: 24,
                               height: 24,
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.6),
+                                color: Colors.white.withValues(alpha: 0.16),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Icon(Icons.chevron_right, color: Color(0xFF7B6B3A), size: 18),
+                              child: const Icon(Icons.chevron_right, color: Colors.white, size: 18),
                             ),
                           ],
                         ),
@@ -748,19 +1027,19 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
   }
 
   Widget _quickAction(IconData icon, String title, VoidCallback onTap) {
-      Color accentColor;
-      List<Color> surfaceColors;
-      Color borderColor;
+    Color accentColor;
+    List<Color> surfaceColors;
+    Color borderColor;
 
-      if (title.contains('Scan')) {
-        accentColor = const Color(0xFF2F6BFF);
-        surfaceColors = const [Color(0xFFF7FAFF), Color(0xFFEDF3FF), Color(0xFFF9FBFF)];
-        borderColor = const Color(0xFFD6E4FF);
-      } else {
-        accentColor = const Color(0xFF0EA5A4);
-        surfaceColors = const [Color(0xFFF4FFFD), Color(0xFFE9FFFB), Color(0xFFF6FFFD)];
-        borderColor = const Color(0xFFCDEFEA);
-      }
+    if (title.contains('Scan')) {
+      accentColor = const Color(0xFF2F6BFF);
+      surfaceColors = const [Color(0xFFF7FAFF), Color(0xFFEDF3FF), Color(0xFFF9FBFF)];
+      borderColor = const Color(0xFFD6E4FF);
+    } else {
+      accentColor = const Color(0xFF0EA5A4);
+      surfaceColors = const [Color(0xFFF4FFFD), Color(0xFFE9FFFB), Color(0xFFF6FFFD)];
+      borderColor = const Color(0xFFCDEFEA);
+    }
 
     return Material(
       color: Colors.transparent,
@@ -773,10 +1052,10 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-                colors: surfaceColors,
+              colors: surfaceColors,
             ),
             borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: borderColor, width: 1.2),
+            border: Border.all(color: borderColor, width: 1.2),
             boxShadow: [
               BoxShadow(
                 color: Colors.white.withValues(alpha: 0.95),
@@ -785,7 +1064,7 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
                 spreadRadius: 1,
               ),
               BoxShadow(
-                  color: accentColor.withValues(alpha: 0.16),
+                color: accentColor.withValues(alpha: 0.16),
                 blurRadius: 14,
                 offset: const Offset(0, 4),
               ),
@@ -950,10 +1229,10 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
                   });
                   _syncSelectionMode();
                 },
-                activeColor: const Color(0xFF2F6BFF),
+                activeColor: const Color(0xFFF5B027),
                 checkColor: Colors.white,
                 side: BorderSide(
-                  color: isSelected ? const Color(0xFF2F6BFF) : const Color(0xFFD1D5DB),
+                  color: isSelected ? const Color(0xFFF5B027) : const Color(0xFFD1D5DB),
                   width: 2,
                 ),
                 shape: RoundedRectangleBorder(

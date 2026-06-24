@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dotted_border/dotted_border.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ShareDocumentScreen extends StatefulWidget {
@@ -20,8 +21,8 @@ class ShareDocumentScreen extends StatefulWidget {
 }
 
 class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
-  static const Color _primaryBlue = Color(0xFF1F56FF);
-  static const Color _deepBlue = Color(0xFF0C2D7A);
+  static const Color _primaryBlue = Color(0xFFFFB800);
+  static const Color _deepBlue = Color(0xFF8B6400);
   static const Color _mint = Color(0xFF16B8A6);
   static const Color _pageBg = Color(0xFFF3F7FF);
 
@@ -206,19 +207,23 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
       backgroundColor: _pageBg,
       appBar: AppBar(
         backgroundColor: _deepBlue,
-        foregroundColor: Colors.white,
+        foregroundColor: const Color(0xFF1A1A1A),
         centerTitle: true,
         elevation: 0,
         flexibleSpace: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF0A2A76), Color(0xFF2A63FF)],
+              colors: const [
+                Color(0xFFFFB800),
+                Color(0xCCFFC93A),
+                Color(0x88FFE7A3),
+              ],
             ),
           ),
         ),
-        title: const Text('Share Document', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Share Document', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A))),
       ),
       body: SafeArea(
         child: Container(
@@ -270,7 +275,7 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [Color(0xFF1746D9), Color(0xFF2F6BFF)],
+                            colors: [Color(0xFF101010), Color(0xFF2A2A2A)],
                           ),
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -529,7 +534,7 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
                       gradient: const LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [Color(0xFF1A4CE4), Color(0xFF2E9CFF)],
+                        colors: [Color(0xFFFFB800), Color(0xFFF5A300)],
                       ),
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -539,14 +544,14 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
                         elevation: 0,
                         backgroundColor: Colors.transparent,
                         shadowColor: Colors.transparent,
-                        foregroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF1A1A1A),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       child: _isSending
                           ? const SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1A1A1A)),
                             )
                           : const Text('Share Securely', style: TextStyle(fontWeight: FontWeight.w800)),
                     ),
@@ -659,14 +664,14 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF2B64FF) : const Color(0xFFE9F0FF),
+          color: selected ? const Color(0xFFFFB800) : const Color(0xFFFFF5D8),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: selected ? const Color(0xFF2B64FF) : const Color(0xFFCFDBF6)),
+          border: Border.all(color: selected ? const Color(0xFFFFB800) : const Color(0xFFE9D08A)),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : const Color(0xFF4A5F8F),
+            color: selected ? const Color(0xFF1A1A1A) : const Color(0xFF7A5A07),
             fontWeight: FontWeight.w700,
             fontSize: 11,
           ),
@@ -685,31 +690,35 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
             _searchController.clear();
           });
         },
-        child: Container(
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            gradient: selected
-                ? const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1846DA), Color(0xFF2B64FF)],
-                  )
-                : const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFF5F8FF), Color(0xFFEDF2FF)],
-                  ),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: selected ? const Color(0xFF2F6BFF) : const Color(0xFFD8E2F8),
+        child: DottedBorder(
+          borderType: BorderType.RRect,
+          radius: const Radius.circular(22),
+          strokeWidth: 1.1,
+          dashPattern: const [3, 3],
+          color: selected ? const Color(0xFFFFE49A) : const Color(0xFFF0DB9C),
+          child: Container(
+            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              gradient: selected
+                  ? const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFFC21F), Color(0xFFFFB000)],
+                    )
+                  : const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFFFAEB), Color(0xFFFFF2CC)],
+                    ),
+              borderRadius: BorderRadius.circular(22),
             ),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected ? Colors.white : const Color(0xFF4B5565),
-              fontWeight: FontWeight.w600,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? const Color(0xFF1A1A1A) : const Color(0xFF745500),
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),

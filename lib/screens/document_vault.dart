@@ -21,10 +21,10 @@ class DocumentVaultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF5B027),
+        foregroundColor: const Color(0xFF111111),
         elevation: 0,
         title: const Text('Tools', style: TextStyle(fontWeight: FontWeight.w700)),
         actions: [
@@ -32,18 +32,18 @@ class DocumentVaultScreen extends StatelessWidget {
             margin: const EdgeInsets.only(right: 10),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF0D201B),
+              color: const Color(0xFFFFE8A8),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFF0B3B31)),
+              border: Border.all(color: const Color(0xFFF0D381)),
             ),
             child: const Text(
               "What's New",
-              style: TextStyle(color: Color(0xFF11B89A), fontWeight: FontWeight.w600),
+              style: TextStyle(color: Color(0xFF8A6500), fontWeight: FontWeight.w600),
             ),
           ),
           const Padding(
             padding: EdgeInsets.only(right: 16),
-            child: Icon(Icons.search, color: Colors.white),
+            child: Icon(Icons.search, color: Color(0xFF111111)),
           ),
         ],
       ),
@@ -55,7 +55,7 @@ class DocumentVaultScreen extends StatelessWidget {
             children: [
               const Text(
                 'Convert',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                style: TextStyle(color: Color(0xFF111111), fontSize: 18, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 18),
               GridView.count(
@@ -109,7 +109,7 @@ class _ToolItem extends StatelessWidget {
         Text(
           label,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.1),
+          style: const TextStyle(color: Color(0xFF111111), fontSize: 12, height: 1.1),
         ),
       ],
     );
