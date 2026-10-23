@@ -35,7 +35,7 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 20),
                   Text(
-                    'John M. Komba',
+                    'Yusuph J. Mwenda',
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   SizedBox(height: 6),

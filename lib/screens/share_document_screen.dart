@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:dotted_border/dotted_border.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../services/document_registry.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
 
 class ShareDocumentScreen extends StatefulWidget {
   const ShareDocumentScreen({
@@ -8,6 +11,7 @@ class ShareDocumentScreen extends StatefulWidget {
     required this.referenceNumber,
     required this.notes,
     required this.attachedImagePaths,
+    this.record,
     super.key,
   });
 
@@ -16,19 +20,17 @@ class ShareDocumentScreen extends StatefulWidget {
   final String notes;
   final List<String> attachedImagePaths;
 
+  /// Registry entry of the scan, when it has been issued a document ID.
+  final ScannedDocumentRecord? record;
+
   @override
   State<ShareDocumentScreen> createState() => _ShareDocumentScreenState();
 }
 
 class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
-  static const Color _primaryBlue = Color(0xFFFFB800);
-  static const Color _deepBlue = Color(0xFF8B6400);
-  static const Color _mint = Color(0xFF16B8A6);
-  static const Color _pageBg = Color(0xFFF3F7FF);
-
   final TextEditingController _searchController = TextEditingController();
   final List<_ShareRecipient> _recipients = <_ShareRecipient>[
-    _ShareRecipient(category: 'Staff', name: 'John M. Komba', email: 'john.komba@tra.go.tz'),
+    _ShareRecipient(category: 'Staff', name: 'Yusuph J. Mwenda', email: 'yusuph.mwenda@tra.go.tz'),
     _ShareRecipient(category: 'Staff', name: 'Grace Nyerere', email: 'grace.nyerere@tra.go.tz'),
     _ShareRecipient(category: 'Staff', name: 'Peter Mwita', email: 'peter.mwita@tra.go.tz'),
     _ShareRecipient(category: 'Staff', name: 'Fatuma Mushi', email: 'fatuma.mushi@tra.go.tz'),
@@ -148,11 +150,14 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
         'A document has been shared with you within TRA.\n\n'
         'Title: ${widget.title}\n'
         'Reference: ${widget.referenceNumber}\n'
+        '${widget.record == null ? '' : 'Document ID: ${widget.record!.id}\n'
+            'SHA-256 Fingerprint: ${widget.record!.fingerprint}\n'}'
         'Share Type: $_shareMode\n'
         'To Recipients: ${toRecipients.length}\n'
         'CC Recipients: ${ccRecipients.length}\n'
         'Attached Pages: ${widget.attachedImagePaths.length}\n'
         'Notes: ${widget.notes.isEmpty ? '-' : widget.notes}\n\n'
+        '${widget.record == null ? '' : 'Verify this document in TRA SecureScan > Verify Document.\n'}'
         'This share is intended for TRA network recipients only.',
       );
 
@@ -203,364 +208,261 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final List<_ShareRecipient> filtered = _filteredRecipients;
+    final int selectedCount = _selectedRecipients.length + (_sendToAllStaff ? 1 : 0);
+
     return Scaffold(
-      backgroundColor: _pageBg,
-      appBar: AppBar(
-        backgroundColor: _deepBlue,
-        foregroundColor: const Color(0xFF1A1A1A),
-        centerTitle: true,
-        elevation: 0,
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: const [
-                Color(0xFFFFB800),
-                Color(0xCCFFC93A),
-                Color(0x88FFE7A3),
-              ],
-            ),
-          ),
-        ),
-        title: const Text('Share Document', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF1A1A1A))),
-      ),
+      appBar: AppBar(title: const Text('Share Document')),
       body: SafeArea(
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFEAF1FF), Color(0xFFF7FAFF), Color(0xFFFFFFFF)],
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.white,
-                        const Color(0xFFEFF4FF),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: const Color(0xFFD9E5FF)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.white.withValues(alpha: 0.95),
-                        blurRadius: 14,
-                        offset: const Offset(-1, -1),
-                      ),
-                      BoxShadow(
-                        color: _primaryBlue.withValues(alpha: 0.09),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFF101010), Color(0xFF2A2A2A)],
-                          ),
-                          borderRadius: BorderRadius.circular(12),
+        child: Column(
+          children: [
+            Expanded(
+              child: CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        FadeSlideIn(child: _buildDocumentCard()),
+                        const SizedBox(height: 22),
+                        const SectionHeader('Share To'),
+                        const SizedBox(height: 12),
+                        PillSegmented(
+                          options: const ['Staff', 'Department', 'Group'],
+                          selected: _shareMode,
+                          onChanged: (value) {
+                            setState(() {
+                              _shareMode = value;
+                              _searchController.clear();
+                            });
+                          },
                         ),
-                        child: const Icon(Icons.shield_outlined, color: Colors.white),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF102563),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _searchController,
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            hintText: 'Search ${_shareMode.toLowerCase()} name or email...',
+                            prefixIcon: const Icon(Icons.search_rounded),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _buildAllStaffCard(),
+                        const SizedBox(height: 18),
+                        SectionHeader(
+                          '$_shareMode Directory',
+                          trailing: StatusBadge(label: '${filtered.length} available'),
+                        ),
+                        const SizedBox(height: 10),
+                      ]),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                    sliver: filtered.isEmpty
+                        ? const SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 28),
+                              child: Center(
+                                child: Text('No matches found', style: TextStyle(color: AppColors.textMedium)),
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Ref: ${widget.referenceNumber}',
-                              style: const TextStyle(
-                                color: Color(0xFF5770A3),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text('Share To', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF1A2E61))),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _chipButton('Staff'),
-                    const SizedBox(width: 8),
-                    _chipButton('Department'),
-                    const SizedBox(width: 8),
-                    _chipButton('Group'),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _searchController,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Search ${_shareMode.toLowerCase()} name or email...',
-                    hintStyle: const TextStyle(color: Color(0xFF7E8FAF)),
-                    prefixIcon: const Icon(Icons.search, color: Color(0xFF4762A1)),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFD5DFF5)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF2F6BFF), width: 1.5),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFDCE5F8)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.groups_2_outlined, size: 18, color: Color(0xFF3C5694)),
-                      const SizedBox(width: 8),
-                      Text(
-                        '$_shareMode Directory • ${_filteredRecipients.length} available',
-                        style: const TextStyle(
-                          color: Color(0xFF425A93),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFF6FAFF), Color(0xFFEDF4FF)],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFDCE5F8)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.groups, size: 18, color: Color(0xFF3C5694)),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Text(
-                              'All Staff Group (no manual selection needed)',
-                              style: TextStyle(color: Color(0xFF425A93), fontWeight: FontWeight.w600, fontSize: 12),
+                          )
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) => _buildRecipientTile(filtered[index]),
+                              childCount: filtered.length,
                             ),
                           ),
-                          Switch(
-                            value: _sendToAllStaff,
-                            onChanged: (value) {
-                              setState(() {
-                                _sendToAllStaff = value;
-                              });
-                            },
-                            activeColor: _primaryBlue,
-                          ),
-                        ],
-                      ),
-                      if (_sendToAllStaff)
-                        Row(
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                    sliver: SliverToBoxAdapter(
+                      child: AppCard(
+                        color: AppColors.successSoft,
+                        borderColor: AppColors.successSoft,
+                        shadow: const [],
+                        padding: const EdgeInsets.all(14),
+                        child: const Row(
                           children: [
-                            _routeChip(
-                              selected: !_allStaffAsCc,
-                              label: 'To',
-                              onTap: () {
-                                setState(() {
-                                  _allStaffAsCc = false;
-                                });
-                              },
-                            ),
-                            const SizedBox(width: 8),
-                            _routeChip(
-                              selected: _allStaffAsCc,
-                              label: 'CC',
-                              onTap: () {
-                                setState(() {
-                                  _allStaffAsCc = true;
-                                });
-                              },
-                            ),
-                            const SizedBox(width: 10),
-                            const Expanded(
+                            Icon(Icons.verified_user_outlined, color: AppColors.success),
+                            SizedBox(width: 10),
+                            Expanded(
                               child: Text(
-                                'group.allstaff@tra.go.tz',
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: Color(0xFF5D73A2), fontSize: 12),
+                                'Recipients will be able to view this document within TRA network only.',
+                                style: TextStyle(color: AppColors.success, fontSize: 13, height: 1.35),
                               ),
                             ),
                           ],
                         ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Color(0xFFFFFFFF), Color(0xFFF5F9FF)],
                       ),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFDCE5F8)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.white.withValues(alpha: 0.95),
-                          blurRadius: 16,
-                          offset: const Offset(-1, -1),
-                        ),
-                        BoxShadow(
-                          color: _primaryBlue.withValues(alpha: 0.08),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ListView.separated(
-                      itemCount: _filteredRecipients.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFE7EDF9)),
-                      itemBuilder: (context, index) {
-                        final _ShareRecipient recipient = _filteredRecipients[index];
-                        return _buildRecipientTile(recipient);
-                      },
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFEFF7FF), Color(0xFFE5F2FF)],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                border: Border(top: BorderSide(color: AppColors.border)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
                     children: [
-                      const Icon(Icons.attach_file, color: Color(0xFF0C4A9A)),
-                      const SizedBox(width: 8),
+                      const Icon(Icons.attach_file_rounded, size: 18, color: AppColors.primaryDark),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           widget.attachedImagePaths.isEmpty
                               ? 'No attached document found'
-                              : '${widget.attachedImagePaths.length} page(s) attached and ready to share',
-                          style: const TextStyle(color: Color(0xFF0C4A9A), fontWeight: FontWeight.w600),
+                              : '${widget.attachedImagePaths.length} page(s) attached',
+                          style:
+                              const TextStyle(color: AppColors.textMedium, fontWeight: FontWeight.w600, fontSize: 13),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFEFFDF6), Color(0xFFE3FAF1)],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.warning_amber_rounded, color: Color(0xFF1E8C73)),
-                      SizedBox(width: 8),
-                      Expanded(
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
                         child: Text(
-                          'Recipients will be able to view this document within TRA network only.',
-                          style: TextStyle(color: Color(0xFF176A57), fontSize: 13),
+                          '$selectedCount recipient${selectedCount == 1 ? '' : 's'}',
+                          key: ValueKey<int>(selectedCount),
+                          style: const TextStyle(color: AppColors.textHigh, fontWeight: FontWeight.w700, fontSize: 13),
                         ),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFFFFB800), Color(0xFFF5A300)],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ElevatedButton(
-                      onPressed: _isSending || widget.attachedImagePaths.isEmpty ? null : _shareSecurely,
-                      style: ElevatedButton.styleFrom(
-                        elevation: 0,
-                        backgroundColor: Colors.transparent,
-                        shadowColor: Colors.transparent,
-                        foregroundColor: const Color(0xFF1A1A1A),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: _isSending
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF1A1A1A)),
-                            )
-                          : const Text('Share Securely', style: TextStyle(fontWeight: FontWeight.w800)),
-                    ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: _isSending || widget.attachedImagePaths.isEmpty ? null : _shareSecurely,
+                    icon: _isSending
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
+                          )
+                        : const Icon(Icons.lock_outline_rounded, size: 20),
+                    label: const Text('Share Securely'),
                   ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDocumentCard() {
+    return AppCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          const IconTile(icon: Icons.shield_outlined, size: 46),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textHigh),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Ref: ${widget.referenceNumber}',
+                  style: const TextStyle(color: AppColors.textLow, fontSize: 12, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllStaffCard() {
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+      color: _sendToAllStaff ? AppColors.primaryTint : AppColors.surface,
+      borderColor: _sendToAllStaff ? AppColors.primary : AppColors.border,
+      shadow: const [],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const IconTile(icon: Icons.groups_rounded, size: 36),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'All Staff Group',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textHigh),
+                    ),
+                    Text(
+                      'No manual selection needed',
+                      style: TextStyle(color: AppColors.textLow, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _sendToAllStaff,
+                onChanged: (value) {
+                  setState(() {
+                    _sendToAllStaff = value;
+                  });
+                },
+              ),
+            ],
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            child: _sendToAllStaff
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 6),
+                    child: Row(
+                      children: [
+                        _routeChip(
+                          selected: !_allStaffAsCc,
+                          label: 'To',
+                          onTap: () {
+                            setState(() {
+                              _allStaffAsCc = false;
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 6),
+                        _routeChip(
+                          selected: _allStaffAsCc,
+                          label: 'CC',
+                          onTap: () {
+                            setState(() {
+                              _allStaffAsCc = true;
+                            });
+                          },
+                        ),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'group.allstaff@tra.go.tz',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: AppColors.textMedium, fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
       ),
     );
   }
@@ -569,56 +471,58 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
     final bool isDepartment = recipient.category == 'Department';
     final bool isGroup = recipient.category == 'Group';
 
-    final Color badgeBg = isDepartment
-        ? const Color(0xFFE7F1FF)
-        : isGroup
-            ? const Color(0xFFEEE8FF)
-            : _mint.withValues(alpha: 0.15);
-
-    final Color badgeIconColor = isDepartment
-        ? const Color(0xFF2A62D8)
-        : isGroup
-            ? const Color(0xFF6A4BD8)
-            : const Color(0xFF148C7A);
-
     final IconData badgeIcon = isDepartment
         ? Icons.apartment_rounded
         : isGroup
             ? Icons.groups_2_outlined
-            : Icons.verified_user_outlined;
+            : Icons.person_outline_rounded;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+    return AppCard(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
+      color: recipient.selected ? AppColors.primaryTint : AppColors.surface,
+      borderColor: recipient.selected ? AppColors.primary : AppColors.border,
+      shadow: const [],
+      onTap: () {
+        setState(() {
+          recipient.selected = !recipient.selected;
+        });
+      },
       child: Row(
         children: [
           Checkbox(
             value: recipient.selected,
-            activeColor: _primaryBlue,
-            checkColor: Colors.white,
             onChanged: (value) {
               setState(() {
                 recipient.selected = value ?? false;
               });
             },
           ),
+          IconTile(icon: badgeIcon, size: 36),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   recipient.name,
-                  style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF172E64)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textHigh),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   recipient.subtitle == null ? recipient.email : '${recipient.subtitle} • ${recipient.email}',
-                  style: const TextStyle(color: Color(0xFF6278A4), fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textLow, fontSize: 12),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
           _routeChip(
-            selected: recipient.delivery == _DeliveryType.to,
+            selected: recipient.selected && recipient.delivery == _DeliveryType.to,
             label: 'To',
             onTap: () {
               setState(() {
@@ -629,7 +533,7 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
           ),
           const SizedBox(width: 6),
           _routeChip(
-            selected: recipient.delivery == _DeliveryType.cc,
+            selected: recipient.selected && recipient.delivery == _DeliveryType.cc,
             label: 'CC',
             onTap: () {
               setState(() {
@@ -637,16 +541,6 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
                 recipient.selected = true;
               });
             },
-          ),
-          const SizedBox(width: 8),
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: badgeBg,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(badgeIcon, color: badgeIconColor, size: 18),
           ),
         ],
       ),
@@ -658,68 +552,22 @@ class _ShareDocumentScreenState extends State<ShareDocumentScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(8),
+    return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFFFB800) : const Color(0xFFFFF5D8),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: selected ? const Color(0xFFFFB800) : const Color(0xFFE9D08A)),
+          color: selected ? AppColors.primary : AppColors.surfaceMuted,
+          borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? const Color(0xFF1A1A1A) : const Color(0xFF7A5A07),
+            color: selected ? AppColors.onPrimary : AppColors.textMedium,
             fontWeight: FontWeight.w700,
             fontSize: 11,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _chipButton(String label) {
-    final bool selected = _shareMode == label;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _shareMode = label;
-            _searchController.clear();
-          });
-        },
-        child: DottedBorder(
-          borderType: BorderType.RRect,
-          radius: const Radius.circular(22),
-          strokeWidth: 1.1,
-          dashPattern: const [3, 3],
-          color: selected ? const Color(0xFFFFE49A) : const Color(0xFFF0DB9C),
-          child: Container(
-            alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              gradient: selected
-                  ? const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFFFC21F), Color(0xFFFFB000)],
-                    )
-                  : const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFFFFAEB), Color(0xFFFFF2CC)],
-                    ),
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: selected ? const Color(0xFF1A1A1A) : const Color(0xFF745500),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
           ),
         ),
       ),

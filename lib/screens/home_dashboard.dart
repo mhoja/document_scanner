@@ -1,11 +1,18 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 
+import '../services/document_registry.dart';
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
+import '../widgets/document_id_card.dart';
 import 'document_vault.dart';
 import 'my_scans_screen.dart';
 import 'profile_screen.dart';
 import 'recent_document_preview_screen.dart';
 import 'scan_camera_screen.dart';
 import 'share_document_screen.dart';
+import 'verify_document_screen.dart';
 
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({super.key});
@@ -18,113 +25,143 @@ class _HomeDashboardState extends State<HomeDashboard> {
   int currentIndex = 0;
   bool _isSelectionModeActive = false;
 
+  void _onSelectionModeChanged(bool isSelecting) {
+    if (_isSelectionModeActive != isSelecting) {
+      setState(() {
+        _isSelectionModeActive = isSelecting;
+      });
+    }
+  }
+
   Widget _currentScreen() {
     switch (currentIndex) {
       case 0:
-        return HomeDashboardContent(
-          onSelectionModeChanged: (isSelecting) {
-            if (_isSelectionModeActive != isSelecting) {
-              setState(() {
-                _isSelectionModeActive = isSelecting;
-              });
-            }
-          },
-        );
+        return HomeDashboardContent(onSelectionModeChanged: _onSelectionModeChanged);
       case 1:
         return const DocumentVaultScreen();
       case 2:
         return const ScanCameraScreen();
       case 3:
-        return MyScansScreen(
-          onSelectionModeChanged: (isSelecting) {
-            if (_isSelectionModeActive != isSelecting) {
-              setState(() {
-                _isSelectionModeActive = isSelecting;
-              });
-            }
-          },
-        );
+        return MyScansScreen(onSelectionModeChanged: _onSelectionModeChanged);
       case 4:
       default:
         return const ProfileScreen();
     }
   }
 
+  void _selectTab(int index) {
+    if (index == currentIndex) {
+      return;
+    }
+    setState(() {
+      currentIndex = index;
+      _isSelectionModeActive = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool hideNav = (currentIndex == 0 || currentIndex == 3) && _isSelectionModeActive;
+
     return Scaffold(
-      body: SafeArea(
-        child: _currentScreen(),
-      ),
-        bottomNavigationBar: ((currentIndex == 0 || currentIndex == 3) && _isSelectionModeActive)
-          ? null
-          : Container(
-              height: 78,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _navItem(
-                    Icons.home,
-                    'Home',
-                    currentIndex == 0,
-                    () => setState(() => currentIndex = 0),
-                  ),
-                  _navItem(
-                    Icons.handyman_outlined,
-                    'Tools',
-                    currentIndex == 1,
-                    () => setState(() => currentIndex = 1),
-                  ),
-                  GestureDetector(
-                    onTap: () => setState(() => currentIndex = 2),
-                    child: Container(
-                      width: 65,
-                      height: 65,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF5B027),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 32),
-                    ),
-                  ),
-                  _navItem(
-                    Icons.history,
-                    'Scans',
-                    currentIndex == 3,
-                    () => setState(() => currentIndex = 3),
-                  ),
-                  _navItem(
-                    Icons.person_outline,
-                    'Profile',
-                    currentIndex == 4,
-                    () => setState(() => currentIndex = 4),
-                  ),
-                ],
-              ),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 280),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(begin: const Offset(0, 0.02), end: Offset.zero).animate(animation),
+              child: child,
             ),
+          );
+        },
+        child: KeyedSubtree(key: ValueKey<int>(currentIndex), child: _currentScreen()),
+      ),
+      bottomNavigationBar: AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        child: hideNav ? const SizedBox(width: double.infinity) : _buildNavBar(),
+      ),
     );
   }
 
-  Widget _navItem(IconData icon, String title, bool active, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: active ? const Color(0xFF2F6BFF) : Colors.grey),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: active ? const Color(0xFF2F6BFF) : Colors.grey,
-            ),
+  Widget _buildNavBar() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 74,
+          child: Row(
+            children: [
+              _navItem(Icons.home_rounded, 'Home', 0),
+              _navItem(Icons.handyman_outlined, 'Tools', 1),
+              Expanded(
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => _selectTab(2),
+                    child: AnimatedScale(
+                      scale: currentIndex == 2 ? 1.06 : 1,
+                      duration: const Duration(milliseconds: 200),
+                      child: Container(
+                        width: 58,
+                        height: 58,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          boxShadow: AppShadows.glow(AppColors.primary),
+                        ),
+                        child: const Icon(Icons.document_scanner_rounded, color: AppColors.onPrimary, size: 28),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              _navItem(Icons.history_rounded, 'Scans', 3),
+              _navItem(Icons.person_outline_rounded, 'Profile', 4),
+            ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, String title, int index) {
+    final bool active = currentIndex == index;
+
+    return Expanded(
+      child: InkWell(
+        onTap: () => _selectTab(index),
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              decoration: BoxDecoration(
+                color: active ? AppColors.primarySoft : Colors.transparent,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: active ? AppColors.onPrimary : AppColors.textLow, size: 24),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: active ? AppColors.textHigh : AppColors.textLow,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -161,15 +198,78 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
     ),
   ];
 
+  /// IDs of saved scans already in the list, so a reload only adds new ones
+  /// and keeps the user's renames and deletions for this session.
+  final Set<String> _loadedIds = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedScans();
+  }
+
+  Future<void> _loadSavedScans() async {
+    final List<ScannedDocumentRecord> records = await DocumentRegistry.instance.all();
+    if (!mounted) {
+      return;
+    }
+
+    final List<_RecentDocument> newDocuments = records
+        .where((record) => !_loadedIds.contains(record.id))
+        .map(
+          (record) => _RecentDocument(
+            title: record.title,
+            reference: record.referenceNumber,
+            time: _formatTime(record.issuedAt),
+            notes: record.notes,
+            record: record,
+          ),
+        )
+        .toList();
+    if (newDocuments.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _loadedIds.addAll(newDocuments.map((doc) => doc.record!.id));
+      _recentDocuments.insertAll(0, newDocuments);
+    });
+  }
+
+  static String _formatTime(DateTime time) {
+    final int hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
+    final String minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute ${time.hour < 12 ? 'AM' : 'PM'}';
+  }
+
   bool get _hasSelectedDocuments => _recentDocuments.any((doc) => doc.isSelected);
   int get _selectedCount => _recentDocuments.where((doc) => doc.isSelected).length;
   bool get _canMerge => _selectedCount > 1;
 
-  List<_RecentDocument> get _selectedDocuments =>
-      _recentDocuments.where((doc) => doc.isSelected).toList();
+  List<_RecentDocument> get _selectedDocuments => _recentDocuments.where((doc) => doc.isSelected).toList();
+
+  String get _greeting {
+    final int hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good morning';
+    }
+    if (hour < 17) {
+      return 'Good afternoon';
+    }
+    return 'Good evening';
+  }
 
   void _syncSelectionMode() {
     widget.onSelectionModeChanged?.call(_hasSelectedDocuments);
+  }
+
+  void _clearSelection() {
+    setState(() {
+      for (final _RecentDocument doc in _recentDocuments) {
+        doc.isSelected = false;
+      }
+    });
+    _syncSelectionMode();
   }
 
   Future<void> _handleBulkAction(String action) async {
@@ -183,9 +283,10 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
     }
 
     if (action == 'Delete') {
-      final bool shouldDelete = await _showCompactDeleteSheet(
-        title: 'Delete documents',
-        message: 'Delete $_selectedCount selected document(s)?',
+      final bool shouldDelete = await AppSheets.confirm(
+        context,
+        title: 'Delete documents?',
+        message: 'Delete $_selectedCount selected document(s)? This cannot be undone.',
       );
 
       if (!shouldDelete || !mounted) {
@@ -214,14 +315,68 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
     }
 
     if (action == 'Merge') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Merging $_selectedCount selected document(s)...')),
-      );
+      _mergeSelectedDocuments();
       return;
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$action for $_selectedCount selected document(s).')),
+    );
+  }
+
+  Future<void> _mergeSelectedDocuments() async {
+    final List<_RecentDocument> selectedDocuments = _selectedDocuments;
+    final List<_RecentDocument> withoutPages = selectedDocuments.where((doc) => doc.record == null).toList();
+    if (withoutPages.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Only scanned documents can be merged. "${withoutPages.first.title}" has no scanned pages.')),
+      );
+      return;
+    }
+
+    final String? title = await AppSheets.textInput(
+      context,
+      title: 'Merge ${selectedDocuments.length} documents',
+      initialValue: selectedDocuments.map((doc) => doc.title).join(' + '),
+      hint: 'Name of the merged document',
+      confirmLabel: 'Merge',
+      allowUnchanged: true,
+    );
+    if (title == null || title.trim().isEmpty || !mounted) {
+      return;
+    }
+
+    final ScannedDocumentRecord merged;
+    try {
+      merged = await DocumentRegistry.instance.merge(
+        selectedDocuments.map((doc) => doc.record!).toList(),
+        title: title.trim(),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not merge the documents. Please try again.')),
+        );
+      }
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+
+    _clearSelection();
+    await _loadSavedScans();
+    if (!mounted) {
+      return;
+    }
+
+    await showDocumentIdSheet(
+      context,
+      merged,
+      title: 'Documents Merged',
+      message: '${selectedDocuments.length} documents (${merged.pageCount} pages) were combined into one '
+          'new document with its own unique ID.',
     );
   }
 
@@ -232,13 +387,14 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
     }
 
     final _RecentDocument document = selectedDocuments.first;
-    final String? updatedName = await _showCompactRenameSheet(
-      initialName: document.title,
-      heading: 'Rename document',
+    final String? updatedName = await AppSheets.textInput(
+      context,
+      title: 'Rename document',
+      initialValue: document.title,
       hint: 'Enter new name',
     );
 
-    if (updatedName == null || updatedName.isEmpty || !mounted) {
+    if (updatedName == null || !mounted) {
       return;
     }
 
@@ -251,254 +407,6 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Document renamed successfully.')),
     );
-  }
-
-  Future<String?> _showCompactRenameSheet({
-    required String initialName,
-    required String heading,
-    required String hint,
-  }) async {
-    final TextEditingController controller = TextEditingController(text: initialName);
-
-    final String? value = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-          ),
-          child: Align(
-            alignment: Alignment.center,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 430),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFFB800).withValues(alpha: 0.12),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 28,
-                        height: 2.5,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFB800),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      heading,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFFFF5E6),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: controller,
-                      autofocus: true,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => Navigator.pop(sheetContext, controller.text.trim()),
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFFFF5E6)),
-                      decoration: InputDecoration(
-                        hintText: hint,
-                        hintStyle: const TextStyle(color: Color(0xFF9A8A6E), fontSize: 12),
-                        filled: true,
-                        fillColor: const Color(0xFF242424),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFF3A3A3A)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFF3A3A3A)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 1.2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(sheetContext),
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(32),
-                              side: const BorderSide(color: Color(0xFF555555)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            child: const Text('Cancel', style: TextStyle(fontSize: 11, color: Color(0xFFC0C0C0))),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => Navigator.pop(sheetContext, controller.text.trim()),
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(32),
-                              backgroundColor: const Color(0xFFFFB800),
-                              foregroundColor: const Color(0xFF1A1A1A),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            child: const Text('Save', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    final String trimmed = (value ?? '').trim();
-    if (trimmed.isEmpty || trimmed == initialName) {
-      return null;
-    }
-    return trimmed;
-  }
-
-  Future<bool> _showCompactDeleteSheet({
-    required String title,
-    required String message,
-  }) async {
-    final bool? result = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            20,
-            20,
-            MediaQuery.of(sheetContext).viewInsets.bottom + 20,
-          ),
-          child: Align(
-            alignment: Alignment.center,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 430),
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A1A),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFFB800).withValues(alpha: 0.12),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 28,
-                        height: 2.5,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFB800),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFFFF5E6),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      message,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        height: 1.25,
-                        color: Color(0xFFD0D0D0),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(sheetContext, false),
-                            style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(32),
-                              side: const BorderSide(color: Color(0xFF555555)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            child: const Text('Cancel', style: TextStyle(fontSize: 11, color: Color(0xFFC0C0C0))),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () => Navigator.pop(sheetContext, true),
-                            style: ElevatedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(32),
-                              backgroundColor: const Color(0xFFFFB800),
-                              foregroundColor: const Color(0xFF1A1A1A),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            child: const Text('Delete', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-
-    return result == true;
   }
 
   void _openShareForSelectedDocuments() {
@@ -523,48 +431,13 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
   }
 
   Future<void> _showMoreActions() async {
-    final String? selectedOption = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: const Color(0xFF1E232B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) {
-        return SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white24,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(height: 10),
-              _moreActionTile(
-                icon: Icons.photo_library_outlined,
-                title: 'Save to photo',
-                value: 'save_photo',
-              ),
-              _moreActionTile(
-                icon: Icons.print_outlined,
-                title: 'Print',
-                value: 'print',
-              ),
-              _moreActionTile(
-                icon: Icons.download_outlined,
-                title: 'Save to PC (Download PDF)',
-                value: 'download_pdf',
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
+    final String? selectedOption = await AppSheets.options(
+      context,
+      title: 'More actions',
+      options: const [
+        SheetOption(icon: Icons.photo_library_outlined, title: 'Save to photo', value: 'save_photo'),
+        SheetOption(icon: Icons.picture_as_pdf_outlined, title: 'Save as PDF', value: 'save_pdf'),
+      ],
     );
 
     if (selectedOption == null || !mounted) {
@@ -578,75 +451,9 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
       return;
     }
 
-    if (selectedOption == 'print') {
+    if (selectedOption == 'save_pdf') {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Printing $_selectedCount selected document(s)...')),
-      );
-      return;
-    }
-
-    if (selectedOption == 'download_pdf') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Downloading $_selectedCount selected document(s) as PDF...')),
-      );
-    }
-  }
-
-  Future<void> _confirmDelete(BuildContext context, _RecentDocument document) async {
-    final bool? shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete Document'),
-        content: Text('Delete "${document.title}" from recent documents?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
-        ],
-      ),
-    );
-
-    if (shouldDelete == true && mounted) {
-      setState(() {
-        _recentDocuments.remove(document);
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Document deleted.')),
-      );
-    }
-  }
-
-  Future<void> _showEditNameDialog(BuildContext context, _RecentDocument document) async {
-    final TextEditingController controller = TextEditingController(text: document.title);
-
-    final String? updatedName = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Edit Document Name'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Document name',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-
-    if (updatedName != null && updatedName.isNotEmpty && mounted) {
-      setState(() {
-        document.title = updatedName;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Document name updated.')),
+        SnackBar(content: Text('Saving $_selectedCount selected document(s) as PDF...')),
       );
     }
   }
@@ -676,441 +483,381 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
     return Stack(
       children: [
         SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(0, 0, 0, _hasSelectedDocuments ? 96 : 100),
+          padding: const EdgeInsets.only(bottom: 110),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 30),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5B027),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text('Good morning.', style: TextStyle(color: Colors.black87, fontSize: 14)),
-                          SizedBox(height: 4),
-                          Text(
-                            'John M. Komba',
-                            style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.black),
-                          ),
-                          SizedBox(height: 2),
-                          Text('TRA Officer', style: TextStyle(color: Colors.black87, fontSize: 14)),
-                        ],
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Stack(
-                          children: [
-                            IconButton(
-                              onPressed: () {},
-                              icon: const Icon(Icons.notifications_none, size: 30, color: Colors.white),
-                            ),
-                            Positioned(
-                              right: 10,
-                              top: 10,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Colors.redAccent,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 8),
-                        const CircleAvatar(
-                          radius: 24,
-                          backgroundImage: AssetImage('assets/images/profile.png'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              _buildHeader(),
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Transform.translate(
-                      offset: const Offset(0, -20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFF050505),
-                              Color(0xFF111111),
-                              Color(0xFF000000),
-                            ],
+                      offset: const Offset(0, -28),
+                      child: FadeSlideIn(child: _buildOfflineBanner()),
+                    ),
+                    FadeSlideIn(
+                      index: 1,
+                      child: Row(
+                        children: [
+                          Expanded(child: _statCard('245', 'Documents', Icons.description_outlined)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _statCard('12', 'Pending Sync', Icons.cloud_sync_outlined)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _statCard('6', 'Shared Today', Icons.send_outlined)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    const SectionHeader('Quick Actions'),
+                    const SizedBox(height: 14),
+                    FadeSlideIn(
+                      index: 2,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _quickAction(
+                              Icons.document_scanner_rounded,
+                              'Scan Document',
+                              'Camera or gallery',
+                              highlighted: true,
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (_) => const ScanCameraScreen()),
+                                );
+                                _loadSavedScans();
+                              },
+                            ),
                           ),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: Colors.white24, width: 1.1),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.65),
-                              blurRadius: 18,
-                              offset: const Offset(0, 6),
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.14),
-                                borderRadius: BorderRadius.circular(9),
-                              ),
-                              child: const Icon(Icons.cloud_off_outlined, color: Colors.white, size: 18),
-                            ),
-                            const SizedBox(width: 10),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('You are offline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Your changes will sync when connection is restored.',
-                                    style: TextStyle(fontSize: 11, color: Colors.white),
-                                  ),
-                                ],
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _quickAction(
+                              Icons.handyman_outlined,
+                              'Open Tools',
+                              'Convert & export',
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const DocumentVaultScreen()),
                               ),
                             ),
-                            Container(
-                              width: 24,
-                              height: 24,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.16),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.chevron_right, color: Colors.white, size: 18),
-                            ),
-                          ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    FadeSlideIn(
+                      index: 2,
+                      child: _quickAction(
+                        Icons.verified_user_outlined,
+                        'Verify Document',
+                        'Check a document ID',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const VerifyDocumentScreen()),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 86,
-                            child: _statCard('245', 'Documents'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: SizedBox(
-                            height: 86,
-                            child: _statCard('12', 'Pending Sync'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: SizedBox(
-                            height: 86,
-                            child: _statCard('6', 'Shared Today'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    const Text('Quick Actions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                    const SizedBox(height: 14),
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      childAspectRatio: 2.6,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      children: [
-                        _quickAction(Icons.camera_alt, 'Scan Document', () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanCameraScreen()));
-                        }),
-                        _quickAction(Icons.handyman_outlined, 'Open Tools', () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const DocumentVaultScreen()));
-                        }),
-                      ],
-                    ),
                     const SizedBox(height: 28),
-                    const Text('Recent Documents', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    SectionHeader(
+                      'Recent Documents',
+                      trailing: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: _hasSelectedDocuments
+                            ? TextButton(
+                                key: const ValueKey('cancel'),
+                                onPressed: _clearSelection,
+                                child: Text('Cancel ($_selectedCount)'),
+                              )
+                            : StatusBadge(
+                                key: const ValueKey('count'),
+                                label: '${_recentDocuments.length}',
+                              ),
+                      ),
+                    ),
                     const SizedBox(height: 14),
                     if (_recentDocuments.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
+                      const AppCard(
+                        padding: EdgeInsets.symmetric(vertical: 32),
                         child: Center(
-                          child: Text(
-                            'No recent documents available.',
-                            style: TextStyle(color: Colors.grey),
+                          child: Column(
+                            children: [
+                              IconTile(icon: Icons.inbox_outlined, size: 52),
+                              SizedBox(height: 12),
+                              Text('No recent documents', style: TextStyle(color: AppColors.textMedium)),
+                            ],
                           ),
                         ),
                       )
                     else
-                      ..._recentDocuments.map((doc) => _documentTile(context, doc)),
+                      ..._recentDocuments.asMap().entries.map(
+                            (entry) => FadeSlideIn(
+                              index: entry.key + 3,
+                              child: _documentTile(context, entry.value),
+                            ),
+                          ),
                   ],
                 ),
               ),
             ],
           ),
         ),
-        if (_hasSelectedDocuments)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Container(
-                height: 78,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF20242B),
-                  border: Border(top: BorderSide(color: Color(0xFF2E333C))),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: AnimatedSlide(
+            offset: _hasSelectedDocuments ? Offset.zero : const Offset(0, 1.5),
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+            child: SelectionActionBar(
+              actions: [
+                SelectionAction(Icons.share_outlined, 'Share', () => _handleBulkAction('Share')),
+                SelectionAction(Icons.drive_file_move_outline, 'Move', () => _handleBulkAction('Move/Copy')),
+                SelectionAction(
+                  _canMerge ? Icons.merge_type_rounded : Icons.drive_file_rename_outline,
+                  _canMerge ? 'Merge' : 'Rename',
+                  () => _handleBulkAction(_canMerge ? 'Merge' : 'Rename'),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _bottomAction(Icons.share_outlined, 'Share', () => _handleBulkAction('Share')),
-                    _bottomAction(Icons.drive_file_move_outline, 'Move/Copy', () => _handleBulkAction('Move/Copy')),
-                    _bottomAction(
-                      _canMerge ? Icons.merge_type : Icons.drive_file_rename_outline,
-                      _canMerge ? 'Merge' : 'Rename',
-                      () => _handleBulkAction(_canMerge ? 'Merge' : 'Rename'),
-                    ),
-                    _bottomAction(Icons.delete_outline, 'Delete', () => _handleBulkAction('Delete')),
-                    _bottomAction(Icons.more_horiz, 'More', () => _handleBulkAction('More')),
-                  ],
-                ),
-              ),
+                SelectionAction(Icons.delete_outline_rounded, 'Delete', () => _handleBulkAction('Delete')),
+                SelectionAction(Icons.more_horiz_rounded, 'More', () => _handleBulkAction('More')),
+              ],
             ),
           ),
+        ),
       ],
     );
   }
 
-  Widget _statCard(String number, String label) {
-    IconData icon;
-    Color accentColor;
-    List<Color> surfaceColors;
-    Color borderColor;
-
-    if (label.contains('Documents')) {
-      icon = Icons.description_outlined;
-      accentColor = const Color(0xFF2F6BFF);
-      surfaceColors = const [Color(0xFFF7FAFF), Color(0xFFEDF3FF), Color(0xFFF9FBFF)];
-      borderColor = const Color(0xFFD6E4FF);
-    } else if (label.contains('Pending')) {
-      icon = Icons.cloud_sync_outlined;
-      accentColor = const Color(0xFF0EA5A4);
-      surfaceColors = const [Color(0xFFF4FFFD), Color(0xFFE9FFFB), Color(0xFFF6FFFD)];
-      borderColor = const Color(0xFFCDEFEA);
-    } else {
-      icon = Icons.share_outlined;
-      accentColor = const Color(0xFF7C5CFF);
-      surfaceColors = const [Color(0xFFF8F6FF), Color(0xFFF1EDFF), Color(0xFFFBFAFF)];
-      borderColor = const Color(0xFFE1D8FF);
-    }
-
+  Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(9, 8, 9, 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: surfaceColors,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: borderColor, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.white.withValues(alpha: 0.95),
-            blurRadius: 22,
-            offset: const Offset(-2, -2),
-            spreadRadius: 1,
-          ),
-          BoxShadow(
-            color: accentColor.withValues(alpha: 0.16),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 18, 20, 52),
+      decoration: const BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
       ),
-      child: Stack(
+      child: Row(
         children: [
-          Positioned(
-            right: -14,
-            top: -14,
-            child: Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: accentColor.withValues(alpha: 0.12),
-              ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _greeting,
+                  style: TextStyle(color: AppColors.onPrimary.withValues(alpha: 0.7), fontSize: 14),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Yusuph J. Mwenda',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.onPrimary,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'TRA Officer',
+                    style: TextStyle(color: AppColors.onPrimary, fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
             ),
           ),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      number,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        height: 1.0,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF141414),
-                        letterSpacing: -0.25,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF3F3F3F),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.1,
-                      ),
-                    ),
-                  ],
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.35),
+              shape: BoxShape.circle,
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                IconButton(
+                  onPressed: () {},
+                  icon: const Icon(Icons.notifications_none_rounded, size: 24, color: AppColors.onPrimary),
                 ),
-              ),
-              const SizedBox(width: 5),
-              Container(
-                width: 26,
-                height: 26,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFFFFFFFF),
-                      accentColor.withValues(alpha: 0.14),
-                    ],
+                Positioned(
+                  right: 12,
+                  top: 11,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: AppColors.danger,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.primary, width: 1.5),
+                    ),
                   ),
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      blurRadius: 12,
-                      offset: const Offset(-1, -1),
-                    ),
-                  ],
                 ),
-                  child: Icon(icon, color: accentColor, size: 15),
-              ),
-            ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            child: const CircleAvatar(
+              radius: 22,
+              backgroundImage: AssetImage('assets/images/profile.jpg'),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _quickAction(IconData icon, String title, VoidCallback onTap) {
-    Color accentColor;
-    List<Color> surfaceColors;
-    Color borderColor;
+  Widget _buildOfflineBanner() {
+    return AppCard(
+      padding: const EdgeInsets.all(14),
+      shadow: AppShadows.lifted,
+      child: Row(
+        children: [
+          const IconTile(
+            icon: Icons.cloud_off_rounded,
+            color: AppColors.warning,
+            background: AppColors.warningSoft,
+            size: 40,
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'You are offline',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textHigh),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Changes will sync when connection is restored.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMedium),
+                ),
+              ],
+            ),
+          ),
+          Icon(Icons.chevron_right_rounded, color: AppColors.textLow.withValues(alpha: 0.8)),
+        ],
+      ),
+    );
+  }
 
-    if (title.contains('Scan')) {
-      accentColor = const Color(0xFF2F6BFF);
-      surfaceColors = const [Color(0xFFF7FAFF), Color(0xFFEDF3FF), Color(0xFFF9FBFF)];
-      borderColor = const Color(0xFFD6E4FF);
-    } else {
-      accentColor = const Color(0xFF0EA5A4);
-      surfaceColors = const [Color(0xFFF4FFFD), Color(0xFFE9FFFB), Color(0xFFF6FFFD)];
-      borderColor = const Color(0xFFCDEFEA);
+  Widget _statCard(String number, String label, IconData icon) {
+    return AppCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconTile(icon: icon, size: 34),
+          const SizedBox(height: 12),
+          Text(
+            number,
+            style: const TextStyle(
+              fontSize: 22,
+              height: 1,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textHigh,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.textMedium, fontSize: 11, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _quickAction(
+    IconData icon,
+    String title,
+    String subtitle, {
+    required VoidCallback onTap,
+    bool highlighted = false,
+  }) {
+    final Widget content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        IconTile(
+          icon: icon,
+          color: AppColors.onPrimary,
+          background: highlighted ? Colors.white.withValues(alpha: 0.45) : AppColors.primarySoft,
+          size: 42,
+        ),
+        const SizedBox(height: 14),
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textHigh),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: TextStyle(
+            fontSize: 12,
+            color: highlighted ? AppColors.onPrimary.withValues(alpha: 0.65) : AppColors.textLow,
+          ),
+        ),
+      ],
+    );
+
+    if (!highlighted) {
+      return AppCard(onTap: onTap, padding: const EdgeInsets.all(16), child: content);
     }
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: surfaceColors,
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: borderColor, width: 1.2),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withValues(alpha: 0.95),
-                blurRadius: 22,
-                offset: const Offset(-2, -2),
-                spreadRadius: 1,
-              ),
-              BoxShadow(
-                color: accentColor.withValues(alpha: 0.16),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
+    // Frosted glass card: blurred backdrop with yellow fading from solid to translucent.
+    final BorderRadius radius = BorderRadius.circular(20);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: radius,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.22),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: radius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              child: Ink(
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
+                  borderRadius: radius,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.2),
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      const Color(0xFFFFFFFF),
-                      accentColor.withValues(alpha: 0.14),
+                      AppColors.primary.withValues(alpha: 0.95),
+                      AppColors.primary.withValues(alpha: 0.55),
+                      AppColors.primary.withValues(alpha: 0.18),
                     ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      blurRadius: 12,
-                      offset: const Offset(-1, -1),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, color: accentColor, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    height: 1.2,
-                    color: Color(0xFF141414),
-                    letterSpacing: -0.05,
+                    stops: const [0, 0.55, 1],
                   ),
                 ),
+                child: content,
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1119,163 +866,62 @@ class _HomeDashboardContentState extends State<HomeDashboardContent> {
 
   Widget _documentTile(BuildContext context, _RecentDocument document) {
     final bool isSelected = document.isSelected;
-    final Color cardColor = isSelected ? const Color(0xFFEBF4FE) : Colors.white;
-    final Color primaryTextColor = isSelected ? const Color(0xFF1A1F2E) : const Color(0xFF111827);
-    final Color secondaryTextColor = isSelected ? const Color(0xFF6B7280) : const Color(0xFF9CA3AF);
-    final Color borderColor = isSelected ? const Color(0xFF2F6BFF) : const Color(0xFFD6E7FB);
-    final Color iconBgColor = isSelected ? const Color(0xFFD6E7FB) : const Color(0xFFF0F4FF);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(20),
+    return AppCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+      color: isSelected ? AppColors.primaryTint : AppColors.surface,
+      borderColor: isSelected ? AppColors.primary : AppColors.border,
       onTap: () => _openPreview(context, document),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: borderColor, width: 1.3),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.white.withValues(alpha: 0.95),
-              blurRadius: isSelected ? 22 : 18,
-              offset: const Offset(-2, -2),
-              spreadRadius: 1,
-            ),
-            BoxShadow(
-              color: const Color(0xFF000000).withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: iconBgColor,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isSelected ? const Color(0xFFC0D9F7) : const Color(0xFFE0E9F8),
-                  width: 1,
-                ),
-              ),
-              child: Icon(
-                Icons.picture_as_pdf,
-                color: isSelected ? const Color(0xFF2F6BFF) : const Color(0xFF4B82FF),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    document.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: primaryTextColor,
-                      letterSpacing: -0.2,
-                    ),
+      child: Row(
+        children: [
+          const IconTile(
+            icon: Icons.picture_as_pdf_rounded,
+            color: AppColors.danger,
+            background: AppColors.dangerSoft,
+            size: 46,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  document.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: AppColors.textHigh,
+                    letterSpacing: -0.2,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${document.reference} • ${document.time}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: secondaryTextColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF2F6BFF).withOpacity(0.15) : const Color(0xFFD1FAE5),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                'PDF',
-                style: TextStyle(
-                  color: isSelected ? const Color(0xFF2F6BFF) : const Color(0xFF10B981),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 11,
-                  letterSpacing: 0.3,
                 ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 42,
-              height: 42,
-              child: Checkbox(
-                value: document.isSelected,
-                onChanged: (checked) {
-                  setState(() {
-                    document.isSelected = checked ?? false;
-                  });
-                  _syncSelectionMode();
-                },
-                activeColor: const Color(0xFFF5B027),
-                checkColor: Colors.white,
-                side: BorderSide(
-                  color: isSelected ? const Color(0xFFF5B027) : const Color(0xFFD1D5DB),
-                  width: 2,
+                const SizedBox(height: 4),
+                Text(
+                  '${document.reference} • ${document.time}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textLow, fontSize: 12, fontWeight: FontWeight.w500),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          document.record?.isMerged ?? false
+              ? const StatusBadge(label: 'MERGED', color: AppColors.success, background: AppColors.successSoft)
+              : const StatusBadge(label: 'PDF'),
+          Checkbox(
+            value: document.isSelected,
+            onChanged: (checked) {
+              setState(() {
+                document.isSelected = checked ?? false;
+              });
+              _syncSelectionMode();
+            },
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _bottomAction(IconData icon, String label, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 22),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(color: Colors.white, fontSize: 11)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _moreActionTile({
-    required IconData icon,
-    required String title,
-    required String value,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.white),
-      title: Text(
-        title,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-      ),
-      onTap: () => Navigator.pop(context, value),
     );
   }
 }
@@ -1286,6 +932,7 @@ class _RecentDocument {
     required this.reference,
     required this.time,
     required this.notes,
+    this.record,
     this.isSelected = false,
   });
 
@@ -1293,5 +940,8 @@ class _RecentDocument {
   final String reference;
   final String time;
   final String notes;
+
+  /// Registry entry for documents scanned in the app; null for sample documents.
+  final ScannedDocumentRecord? record;
   bool isSelected;
 }

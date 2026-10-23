@@ -29,7 +29,7 @@ class MyScansScreen extends StatelessWidget {
                       status: 'Pending',
                       referenceNumber: 'TRA/ADM/2024/05',
                       notes: 'This circular outlines the new office working hours effective from 21st May 2024.',
-                      scannedBy: 'John M. Komba',
+                      scannedBy: 'Yusuph J. Mwenda',
                     ),
                   ),
                 );
@@ -66,7 +66,7 @@ class MyScansScreen extends StatelessWidget {
                       status: 'Synced',
                       referenceNumber: 'TRA/ADM/2024/06',
                       notes: 'A scanned copy of the office notice saved in your document library.',
-                      scannedBy: 'John M. Komba',
+                      scannedBy: 'Yusuph J. Mwenda',
                     ),
                   ),
                 );

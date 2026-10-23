@@ -1,63 +1,7 @@
-// import 'package:flutter/material.dart';
-// import 'scan_preview_screen.dart';
-
-// class ScanCameraScreen extends StatelessWidget {
-//   const ScanCameraScreen({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: Colors.black,
-//       appBar: AppBar(
-//         backgroundColor: Colors.black,
-//         title: const Text("Scan Document", style: TextStyle(color: Colors.white)),
-//         leading: IconButton(
-//           icon: const Icon(Icons.close, color: Colors.white),
-//           onPressed: () => Navigator.pop(context),
-//         ),
-//       ),
-//       body: Stack(
-//         children: [
-//           const Center(
-//             child: Text(
-//               "Camera Preview\nPosition document within the frame",
-//               textAlign: TextAlign.center,
-//               style: TextStyle(color: Colors.white70, fontSize: 18),
-//             ),
-//           ),
-//           Positioned(
-//             bottom: 40,
-//             left: 0,
-//             right: 0,
-//             child: Center(
-//               child: GestureDetector(
-//                 onTap: () {
-//                   Navigator.push(
-//                     context,
-//                     MaterialPageRoute(builder: (_) => const ScanPreviewScreen()),
-//                   );
-//                 },
-//                 child: Container(
-//                   width: 80,
-//                   height: 80,
-//                   decoration: BoxDecoration(
-//                     shape: BoxShape.circle,
-//                     border: Border.all(color: Colors.yellow, width: 4),
-//                   ),
-//                   child: const Icon(Icons.camera, size: 40, color: Colors.white),
-//                 ),
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-
-import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import 'package:flutter/material.dart';
 
+import '../services/page_source.dart';
+import '../theme/app_theme.dart';
 import 'scan_preview_screen.dart';
 
 class ScanCameraScreen extends StatefulWidget {
@@ -81,10 +25,7 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
     });
 
     try {
-      final List<String>? images = await CunningDocumentScanner.getPictures(
-        noOfPages: _isMultiPage ? 20 : 1,
-        isGalleryImportAllowed: true,
-      );
+      final List<String>? images = await PageSource.capture(maxPages: _isMultiPage ? 20 : 1);
 
       if (!mounted) {
         return;
@@ -129,9 +70,9 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black,
-                      Colors.brown.shade900,
-                      Colors.black,
+                      Color(0xFF121212),
+                      Color(0xFF1E1B16),
+                      Color(0xFF0E0E0E),
                     ],
                   ),
                 ),
@@ -144,12 +85,9 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                      ),
-                      const Icon(Icons.flash_on, color: Colors.white, size: 28),
-                      const Icon(Icons.settings, color: Colors.white, size: 28),
+                      _topButton(Icons.close_rounded, () => Navigator.maybePop(context)),
+                      _topButton(Icons.flash_on_rounded, () {}),
+                      _topButton(Icons.tune_rounded, () {}),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -160,17 +98,15 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
                           width: double.infinity,
                           margin: const EdgeInsets.symmetric(horizontal: 8),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                           ),
-                          child: const Center(
-                            child: Text(
-                              'Align document within the frame',
-                              style: TextStyle(
-                                color: Colors.black54,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w500,
-                              ),
+                          child: Center(
+                            child: Icon(
+                              Icons.document_scanner_outlined,
+                              size: 72,
+                              color: Colors.white.withValues(alpha: 0.18),
                             ),
                           ),
                         ),
@@ -211,16 +147,17 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
                           height: 88,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 4),
+                            border: Border.all(color: AppColors.primary, width: 4),
                           ),
                           child: Center(
                             child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: _isScanning ? 36 : 72,
-                              height: _isScanning ? 36 : 72,
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOutCubic,
+                              width: _isScanning ? 36 : 70,
+                              height: _isScanning ? 36 : 70,
                               decoration: BoxDecoration(
-                                color: _isScanning ? Colors.redAccent : Colors.white,
-                                shape: BoxShape.circle,
+                                color: _isScanning ? AppColors.primary : Colors.white,
+                                borderRadius: BorderRadius.circular(_isScanning ? 10 : 35),
                               ),
                             ),
                           ),
@@ -280,6 +217,17 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
     );
   }
 
+  Widget _topButton(IconData icon, VoidCallback onTap) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.1),
+      shape: const CircleBorder(),
+      child: IconButton(
+        onPressed: onTap,
+        icon: Icon(icon, color: Colors.white, size: 24),
+      ),
+    );
+  }
+
   Widget _actionCircle(IconData icon, {required String label, required VoidCallback onTap}) {
     return Column(
       children: [
@@ -309,14 +257,14 @@ class _ScanCameraScreenState extends State<ScanCameraScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? Colors.white : Colors.transparent,
+          color: selected ? AppColors.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(28),
         ),
         child: Text(
           label,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: selected ? Colors.black : Colors.white,
+            color: selected ? AppColors.onPrimary : Colors.white,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -352,7 +300,7 @@ class _FrameCornerPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
-      ..color = const Color(0xFFF5B027)
+      ..color = AppColors.primary
       ..strokeWidth = 4
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;

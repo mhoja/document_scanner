@@ -15,6 +15,7 @@ class TRASmartScanner extends StatelessWidget {
       title: 'TRA Smart Scanner',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      scrollBehavior: const AppScrollBehavior(),
       home: const SplashScreen(),
     );
   }

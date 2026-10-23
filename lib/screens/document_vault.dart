@@ -1,19 +1,7 @@
-// import 'package:flutter/material.dart';
-
-// class DocumentVaultScreen extends StatelessWidget {
-//   const DocumentVaultScreen({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: const Text("Document Vault")),
-//       body: const Center(
-//         child: Text("Document Vault Screen\n(Coming Soon)"),
-//       ),
-//     );
-//   }
-// }
 import 'package:flutter/material.dart';
+
+import '../theme/app_theme.dart';
+import '../widgets/app_ui.dart';
 
 class DocumentVaultScreen extends StatelessWidget {
   const DocumentVaultScreen({super.key});
@@ -21,60 +9,71 @@ class DocumentVaultScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF5B027),
-        foregroundColor: const Color(0xFF111111),
-        elevation: 0,
-        title: const Text('Tools', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text('Tools'),
+        centerTitle: false,
         actions: [
           Container(
-            margin: const EdgeInsets.only(right: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            margin: const EdgeInsets.only(right: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFE8A8),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFF0D381)),
+              color: Colors.white.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: const Text(
               "What's New",
-              style: TextStyle(color: Color(0xFF8A6500), fontWeight: FontWeight.w600),
+              style: TextStyle(color: AppColors.onPrimary, fontWeight: FontWeight.w600, fontSize: 12),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: Icon(Icons.search, color: Color(0xFF111111)),
+          IconButton(onPressed: () {}, icon: const Icon(Icons.search_rounded)),
+          const SizedBox(width: 4),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        children: const [
+          FadeSlideIn(
+            child: _ToolSection(
+              title: 'Convert',
+              items: [
+                _ToolItem(icon: Icons.description_outlined, label: 'To Word', color: Color(0xFF3B6FE0)),
+                _ToolItem(icon: Icons.grid_on_rounded, label: 'To Excel', color: Color(0xFF16A34A)),
+                _ToolItem(icon: Icons.slideshow_rounded, label: 'To PPT', color: Color(0xFFEA580C)),
+                _ToolItem(icon: Icons.image_outlined, label: 'To Images', color: Color(0xFF0D9488)),
+              ],
+            ),
           ),
         ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Convert',
-                style: TextStyle(color: Color(0xFF111111), fontSize: 18, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 18),
-              GridView.count(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisCount: 4,
-                mainAxisSpacing: 18,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.0,
-                children: const [
-                  _ToolItem(icon: Icons.description, label: 'To Word', color: Color(0xFF5B7CFF)),
-                  _ToolItem(icon: Icons.grid_on, label: 'To Excel', color: Color(0xFF22C55E)),
-                  _ToolItem(icon: Icons.slideshow, label: 'To PPT', color: Color(0xFFFF7A59)),
-                  _ToolItem(icon: Icons.image, label: 'To Images', color: Color(0xFF2DD4BF)),
-                ],
-              ),
-            ],
+    );
+  }
+}
+
+class _ToolSection extends StatelessWidget {
+  const _ToolSection({required this.title, required this.items});
+
+  final String title;
+  final List<_ToolItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(title),
+          const SizedBox(height: 18),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 4,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 8,
+            childAspectRatio: 0.72,
+            children: items,
           ),
-        ),
+        ],
       ),
     );
   }
@@ -93,25 +92,27 @@ class _ToolItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
-            shape: BoxShape.circle,
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$label is coming soon.')),
+        );
+      },
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconTile(icon: icon, color: color, background: color.withValues(alpha: 0.1), size: 50),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: AppColors.textHigh, fontSize: 12, fontWeight: FontWeight.w600),
           ),
-          child: Icon(icon, color: color, size: 26),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Color(0xFF111111), fontSize: 12, height: 1.1),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
